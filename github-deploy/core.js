@@ -87,12 +87,19 @@ const Save = {
 
 // ---------- tiny synth SFX (WebAudio, no asset files) ----------
 const Sfx = (() => {
+  // Soft synthesized SFX: sine thumps + filtered-noise whooshes through a compressor.
+  // (The old square/sawtooth tones and the long beam-charge drone sounded harsh.)
   let ac = null, master = null, noiseBuf = null;
+  let muted = Save.get('muted', false);
+  const last = {};
   function unlock() {
     if (!ac) {
       try {
         ac = new (window.AudioContext || window.webkitAudioContext)();
-        master = ac.createGain(); master.gain.value = 0.28; master.connect(ac.destination);
+        const comp = ac.createDynamicsCompressor();
+        comp.threshold.value = -18; comp.knee.value = 12; comp.ratio.value = 6; comp.attack.value = 0.003; comp.release.value = 0.15;
+        master = ac.createGain(); master.gain.value = muted ? 0 : 0.5;
+        master.connect(comp); comp.connect(ac.destination);
         noiseBuf = ac.createBuffer(1, ac.sampleRate, ac.sampleRate);
         const d = noiseBuf.getChannelData(0);
         for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
@@ -100,43 +107,64 @@ const Sfx = (() => {
     }
     if (ac && ac.state === 'suspended') ac.resume();
   }
-  function tone(f, dur, type = 'sine', vol = 0.2, slide = 0, delay = 0) {
+  function env(g, t0, vol, atk, dur) { // click-free attack/decay envelope
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.linearRampToValueAtTime(vol, t0 + atk);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  }
+  function tone(f, dur, vol = 0.15, slide = 0, delay = 0, type = 'sine') {
     const t0 = ac.currentTime + delay;
     const o = ac.createOscillator(), g = ac.createGain();
     o.type = type; o.frequency.setValueAtTime(f, t0);
-    if (slide) o.frequency.linearRampToValueAtTime(Math.max(20, f + slide), t0 + dur);
-    g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
-    o.connect(g); g.connect(master); o.start(t0); o.stop(t0 + dur + 0.02);
+    if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, f + slide), t0 + dur);
+    env(g, t0, vol, 0.006, dur);
+    o.connect(g); g.connect(master); o.start(t0); o.stop(t0 + dur + 0.03);
   }
-  function noise(dur, vol = 0.3, freq = 2000, type = 'bandpass', delay = 0) {
+  function whoosh(dur, vol = 0.12, f0 = 800, f1 = 2400, q = 1.2, delay = 0) { // band-passed noise sweep
     const t0 = ac.currentTime + delay;
     const s = ac.createBufferSource(); s.buffer = noiseBuf;
-    const f = ac.createBiquadFilter(); f.type = type; f.frequency.value = freq;
-    const g = ac.createGain(); g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
-    s.connect(f); f.connect(g); g.connect(master); s.start(t0); s.stop(t0 + dur + 0.02);
+    const f = ac.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = q;
+    f.frequency.setValueAtTime(f0, t0); f.frequency.exponentialRampToValueAtTime(f1, t0 + dur);
+    const g = ac.createGain(); env(g, t0, vol, Math.min(0.03, dur * 0.3), dur);
+    s.connect(f); f.connect(g); g.connect(master); s.start(t0); s.stop(t0 + dur + 0.03);
   }
+  function thump(f = 90, dur = 0.16, vol = 0.22, delay = 0) { tone(f, dur, vol, -f * 0.5, delay); }
   const P = {
-    ui() { tone(720, 0.07, 'sine', 0.14); },
-    page() { noise(0.12, 0.15, 3000); },
-    swing() { noise(0.1, 0.22, 1200); },
-    slash() { noise(0.09, 0.28, 4500, 'highpass'); tone(1400, 0.05, 'triangle', 0.04, -600); },
-    hit() { noise(0.07, 0.4, 1800); tone(160, 0.08, 'square', 0.1, -80); },
-    crit() { noise(0.12, 0.5, 2500); tone(220, 0.15, 'sawtooth', 0.14, -150); },
-    block() { tone(1100, 0.12, 'triangle', 0.1, -500); tone(1650, 0.08, 'sine', 0.05, -800); },
-    jump() { tone(380, 0.09, 'sine', 0.07, 260); },
-    dodge() { noise(0.15, 0.2, 3000, 'highpass'); },
-    hurt() { tone(180, 0.2, 'sawtooth', 0.16, -110); noise(0.1, 0.28, 900); },
-    smoke() { noise(0.5, 0.25, 400, 'lowpass'); tone(110, 0.4, 'sine', 0.12, -40); },
-    dash() { noise(0.18, 0.25, 2500, 'highpass'); },
-    ult() { tone(220, 0.5, 'sawtooth', 0.1, 440); noise(0.4, 0.2, 1500); },
-    tag() { tone(520, 0.08, 'triangle', 0.13, 380); tone(880, 0.1, 'sine', 0.07, 0, 0.06); },
-    boom() { noise(0.45, 0.5, 500, 'lowpass'); tone(70, 0.45, 'sine', 0.32, -35); },
-    charge() { tone(160, 2.4, 'sawtooth', 0.045, 700); tone(240, 2.4, 'triangle', 0.045, 900); },
-    beam() { noise(0.8, 0.42, 900, 'lowpass'); tone(90, 0.8, 'sawtooth', 0.16, -30); },
-    win() { [523, 659, 784, 1046].forEach((f, i) => tone(f, 0.35, 'triangle', 0.14, 0, i * 0.12)); },
-    lose() { [392, 330, 262].forEach((f, i) => tone(f, 0.5, 'sine', 0.14, 0, i * 0.22)); },
+    ui() { tone(880, 0.06, 0.06); tone(1320, 0.05, 0.03, 0, 0.02); },
+    page() { whoosh(0.18, 0.05, 1200, 3200, 0.8); },
+    swing() { whoosh(0.12, 0.08, 600, 1800); },
+    slash() { whoosh(0.1, 0.09, 1800, 5200, 1.5); },
+    hit() { thump(120, 0.12, 0.2); whoosh(0.05, 0.05, 2000, 1200, 1); },
+    crit() { thump(100, 0.18, 0.26); tone(660, 0.12, 0.05, 220); },
+    block() { tone(1250, 0.1, 0.05, -400); tone(1870, 0.08, 0.025, -600, 0.01); },
+    jump() { whoosh(0.12, 0.05, 500, 1400, 0.9); },
+    dodge() { whoosh(0.16, 0.07, 2600, 900, 1.2); },
+    hurt() { thump(150, 0.18, 0.2); tone(300, 0.15, 0.05, -120); },
+    smoke() { whoosh(0.45, 0.08, 300, 900, 0.7); thump(70, 0.3, 0.12); },
+    water() { whoosh(0.35, 0.09, 900, 300, 0.8); tone(520, 0.2, 0.04, 200); },
+    wind() { whoosh(0.4, 0.09, 400, 2200, 0.7); },
+    dash() { whoosh(0.16, 0.08, 1500, 3800, 1); },
+    ult() { tone(330, 0.35, 0.06, 330); tone(495, 0.35, 0.04, 495, 0.04); whoosh(0.4, 0.07, 500, 2600, 0.8); },
+    synergy() { [392, 523, 659, 784].forEach((f, i) => tone(f, 0.3, 0.05, 0, i * 0.06)); whoosh(0.5, 0.08, 400, 3000, 0.8); },
+    tag() { tone(660, 0.08, 0.06, 220); tone(990, 0.08, 0.04, 0, 0.05); },
+    boom() { thump(70, 0.35, 0.3); whoosh(0.3, 0.07, 900, 200, 0.7); },
+    charge() { tone(220, 0.5, 0.04, 440); tone(330, 0.5, 0.03, 660, 0.25); },
+    beam() { thump(60, 0.5, 0.26); whoosh(0.6, 0.09, 600, 1800, 0.6); },
+    win() { [523, 659, 784, 1046].forEach((f, i) => tone(f, 0.4, 0.07, 0, i * 0.12, 'triangle')); },
+    lose() { [392, 330, 262].forEach((f, i) => tone(f, 0.55, 0.07, 0, i * 0.22)); },
   };
-  return { unlock, play(n) { if (!ac) return; try { if (P[n]) P[n](); } catch (e) { /* ignore */ } } };
+  return {
+    unlock,
+    play(n) {
+      if (!ac || muted) return;
+      const now = ac.currentTime;
+      if (last[n] && now - last[n] < 0.05) return; // drop rapid repeats (flurries used to stack into noise)
+      last[n] = now;
+      try { if (P[n]) P[n](); } catch (e) { /* ignore */ }
+    },
+    get muted() { return muted; },
+    toggle() { muted = !muted; Save.set('muted', muted); if (master) master.gain.value = muted ? 0 : 0.5; if (!muted) this.play('ui'); return muted; },
+  };
 })();
 
 // ---------- input: keyboard + multi-touch virtual buttons ----------
@@ -144,7 +172,7 @@ const Input = (() => {
   const KEYMAP = {
     ArrowLeft: ['left'], KeyA: ['left'], ArrowRight: ['right'], KeyD: ['right'],
     ArrowDown: ['down'], KeyS: ['down'], ArrowUp: ['jump', 'up'], KeyW: ['jump', 'up'],
-    Space: ['jump', 'confirm'], KeyJ: ['attack'], KeyK: ['skill'], KeyU: ['ult'], KeyI: ['ult'],
+    Space: ['jump', 'confirm'], KeyJ: ['attack'], KeyK: ['skill'], KeyU: ['ult'], KeyI: ['ult'], KeyO: ['synergy'], KeyY: ['synergy'], KeyM: ['mute'],
     KeyL: ['dodge'], ShiftLeft: ['dodge'], ShiftRight: ['dodge'], KeyQ: ['tag'], Tab: ['tag'],
     Enter: ['confirm'], NumpadEnter: ['confirm'], Escape: ['pause'], KeyP: ['pause'],
   };

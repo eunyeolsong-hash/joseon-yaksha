@@ -371,36 +371,53 @@ function drawFighter(c, key, x, y, facing, pose = {}) {
   c.restore();
 }
 
-// Doc-art sprite (origin = feet). Movement is suggested with bob / tilt since each pose is a single painting.
-function drawSprite(c, name, x, y, facing, pose = {}) {
+// Doc-art sprite (origin = feet). Each pose is a single painting, so motion comes from
+// a short crossfade between frames (pose.prevFrame / pose.blend), stride bob + squash while
+// moving, attack squash (pose.squash) and a small forward push (pose.lunge).
+function spriteSize(name, pose) {
+  const sp = SPRITES[name], im = Assets.sprites[name], s = sp.s * ((pose && pose.scale) || 1);
+  return [im.naturalWidth * s, im.naturalHeight * s];
+}
+function drawSpriteImage(c, name, facing, pose, sx, sy, alpha) {
   const sp = SPRITES[name], im = Assets.sprites[name];
-  const s = sp.s * (pose.scale || 1), w = im.naturalWidth * s, h = im.naturalHeight * s;
-  const t = pose.t || 0, mv = pose.moving ? 1 : 0;
+  const meta = (typeof SPRITE_META !== 'undefined' && SPRITE_META[name]) || {};
+  const [w, h] = spriteSize(name, pose);
+  const ax = sp.ax != null ? sp.ax : meta.mid != null ? meta.mid : 0.5;
+  const dir = sp.f === 0 ? (facing < 0 ? -1 : 1) : facing * sp.f;
+  c.save();
+  c.globalAlpha *= alpha;
+  c.scale(dir * sx, sy);
+  const src = pose.flash ? Assets.whiteSprite(name) : im;
+  if (!pose.flash && pose.rim !== false) { // soft rim light so dark outfits read against the night scene
+    const aura = (STYLES[name.split('_')[0]] || {}).aura || '#ffffff';
+    c.shadowColor = aura + 'a0'; c.shadowBlur = 8;
+  }
+  c.drawImage(src, -w * ax, -h, w, h);
+  c.restore();
+  return h;
+}
+function drawSprite(c, name, x, y, facing, pose = {}) {
+  const t = pose.t || 0, mv = pose.moving ? 1 : 0, ph = pose.walk || 0;
+  const k = pose.prevFrame && pose.prevFrame !== name && pose.blend != null && Assets.spriteReady(pose.prevFrame) ? clamp(pose.blend, 0, 1) : 1;
+  const h = spriteSize(name, pose)[1];
   c.save();
   c.translate(x, y);
   if (pose.alpha != null) c.globalAlpha *= clamp(pose.alpha, 0, 1);
   if (pose.rot) c.rotate(pose.rot * facing);
-  const tilt = (pose.lean || 0) * 0.55 + (mv ? Math.sin((pose.walk || 0) * 2) * 0.05 : 0);
-  if (tilt) c.rotate(tilt * facing);
-  if (pose.kneel) c.scale(1, 0.78);
-  const bob = mv ? -Math.abs(Math.sin(pose.walk || 0)) * 4 : 0;
-  const breathe = mv ? 1 : 1 + Math.sin(t * 2.4) * 0.012;
+  if (pose.lean) c.rotate(pose.lean * 0.3 * facing);
+  if (pose.kneel) c.scale(1, 0.8);
   if (pose.glow) {
     const g = c.createRadialGradient(0, -h * 0.5, 4, 0, -h * 0.5, h * 0.8);
     g.addColorStop(0, pose.glow + 'aa'); g.addColorStop(1, pose.glow + '00');
     c.fillStyle = g; c.fillRect(-h * 0.8, -h * 1.3, h * 1.6, h * 1.6);
   }
-  const dir = sp.f === 0 ? (facing < 0 ? -1 : 1) : facing * sp.f;
-  c.save();
-  c.translate(0, bob); c.scale(dir, breathe);
-  const src = pose.flash ? Assets.whiteSprite(name) : im;
-  if (!pose.flash && pose.rim !== false) { // soft rim light so dark outfits read against the night scene
-    const aura = (STYLES[name.split('_')[0]] || {}).aura || '#ffffff';
-    c.shadowColor = aura + 'b0'; c.shadowBlur = 9;
-  }
-  c.drawImage(src, -w * sp.ax, -h, w, h);
-  c.shadowBlur = 0;
-  c.restore();
+  const sq = pose.squash || 0;
+  const bob = mv ? -Math.abs(Math.sin(ph)) * 3.5 : 0;
+  const sx = 1 + sq + (mv ? Math.abs(Math.cos(ph)) * 0.025 : 0);
+  const sy = (mv ? 1 - Math.abs(Math.cos(ph)) * 0.02 : 1 + Math.sin(t * 2.2) * 0.01) - sq * 0.6;
+  c.translate((pose.lunge || 0) * facing, bob);
+  if (k < 1) drawSpriteImage(c, pose.prevFrame, facing, pose, sx, sy, 1 - k);
+  drawSpriteImage(c, name, facing, pose, sx, sy, k);
   if (pose.stun) for (let i = 0; i < 3; i++) { const a = t * 5 + i * 2.09; c.fillStyle = '#ffe066'; drawStar(c, Math.cos(a) * 18, -h - 12 + Math.sin(a) * 5, 5); }
   c.restore();
 }
