@@ -1,0 +1,36 @@
+html, body {
+  margin: 0;
+  height: 100%;
+  background: #05060a;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+#game {
+  display: block;
+  touch-action: none;
+  background: #000;
+}
+#rotate {
+  display: none;
+  position: fixed;
+  inset: 0;
+  align-items: center;
+  justify-content: center;
+  background: #05060a;
+  color: #f3c66b;
+  font: 700 20px "Noto Sans KR", sans-serif;
+  text-align: center;
+  padding: 16px;
+}
+/* only on touch phones/tablets held upright — never on desktop windows */
+@media (orientation: portrait) and (pointer: coarse) {
+  #rotate { display: flex; }
+}
