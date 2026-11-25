@@ -71,6 +71,7 @@ const ATLAS = {
   'open.city': ['opening', 300, 0, 724, 330],
   'open.bottom': ['opening', 0, 400, 1024, 176],
   'open.full': ['opening', 0, 0, 1024, 576],
+  'open.hanyang': ['title', 560, 0, 760, 296], // 타이틀 그림 윗부분(달·남산타워·도시) — 로고·버튼 제외
   // --- backgrounds (1920-wide screens) ---
   'bg.title': ['title', 0, 0, 1920, 1080],
   'bg.map': ['map', 0, 0, 1920, 1079],
@@ -122,9 +123,40 @@ const SPRITES = {
 // tinted per speaker for characters the doc has no art for (신령님, 박쥐 수인, 땅굴대장 …).
 const BUSTS = { dongmin: 1.0, hocheol: 1.04, seondal: 1.0, simcheong: 0.95, haenim: 1.0, dalnim: 0.95, shadow: 0.9 };
 
+// Skill VFX cut out of 「캐릭터 스킬 VFX 에셋 시트」 (5 sheets × 5 effects, checkerboard keyed to alpha).
+// File = 'vfx_<name>.webp'. Comments name the doc entry each one illustrates.
+const VFX = [
+  'seondal_aura',      // 풍류의 잔상 — 기운 축적 오라 (Gathering Aura)
+  'seondal_blade',     // 만리추풍 — 풍압 화살 투사체 (Wind Blade Projectile)
+  'seondal_crescent',  // 만리추풍 — 초승달 풍압 참격 (Crescent Slash)
+  'seondal_burst',     // 만리추풍 — 방사형 풍압 폭발 (Explosive Burst)
+  'seondal_tornado',   // 천풍만리 — 거대 에너지 회오리 (Tornado Vortex)
+  'dongmin_mark', 'dongmin_markS', // 해체 본능 — 급소 조준 표식 (Weakpoint Target Mark)
+  'dongmin_grapple',   // 해체자의 악력 — 악력 제압 (Grapple)
+  'dongmin_slam',      // 해체자의 악력 — 지면 내리꽂기 (Ground Slam)
+  'dongmin_xslash',    // 광인의 해체식 — 쌍검 X자 돌진 참격
+  'dongmin_frenzy',    // 광인의 해체식 — 광기 연속 난도질 파동
+  'dongmin_cleave',    // 광인의 해체식 — 수직 내려베기 지면 파쇄
+  'hocheol_eyes',      // 맹호의 위압 — 맹호 안광 및 위압 파동
+  'hocheol_chains',    // 흑연호박 — 검은 연기 사슬 속박
+  'hocheol_head',      // 흑연호박 — 흑호 형상 연기 투사체
+  'hocheol_claw',      // 흑연호왕 — 흑연 맹호 발톱 할퀴기
+  'hocheol_roar',      // 흑연호왕 — 거대 흑호 포효 광역 폭발
+  'simcheong_regen',   // 인당수의 한 — 심해 수류 재생 오라
+  'simcheong_stream',  // 심연수류 — 고압 직선 수류 참격
+  'simcheong_whirl',   // 흑련개화 — 심해 소용돌이 견인
+  'simcheong_lotus',   // 흑련개화 — 거대 흑련 만개 영역
+  'simcheong_descent', // 야차강림 — 수면 내려찍기 파멸 폭발
+  'boss_ganjang',      // 해님 — 간장 연속 참격
+  'boss_makya',        // 달님 — 막야 구속 참격
+  'boss_seal',         // 달님 — 봉마 구속 진
+  'boss_converge',     // 합동 — 쌍검 에너지 수렴
+  'boss_beam',         // 합동 — 쌍검 에너지 광선
+];
+
 const Assets = {
-  imgs: {}, sprites: {}, busts: {}, white: {}, tinted: {}, loaded: 0, failed: [],
-  total: Object.keys(IMG_FILES).length + Object.keys(SPRITES).length + Object.keys(BUSTS).length,
+  imgs: {}, sprites: {}, busts: {}, vfx: {}, white: {}, tinted: {}, loaded: 0, failed: [],
+  total: Object.keys(IMG_FILES).length + Object.keys(SPRITES).length + Object.keys(BUSTS).length + VFX.length,
   load(onDone) {
     const done = () => { if (this.loaded + this.failed.length === this.total) onDone && onDone(); };
     const add = (store, key, src) => {
@@ -136,7 +168,9 @@ const Assets = {
     for (const [k, f] of Object.entries(IMG_FILES)) add(this.imgs, k, f + '?v=2');
     for (const k of Object.keys(SPRITES)) add(this.sprites, k, k + '.png?v=2');
     for (const k of Object.keys(BUSTS)) add(this.busts, k, k + '.png?v=2');
+    for (const k of VFX) add(this.vfx, k, 'vfx_' + k + '.webp?v=3');
   },
+  vfxReady(name) { const im = this.vfx[name]; return !!(im && im.complete && im.naturalWidth); },
   spriteReady(name) { const im = this.sprites[name]; return !!(im && im.complete && im.naturalWidth); },
   bustReady(key) { const im = this.busts[key]; return !!(im && im.complete && im.naturalWidth); },
   // white silhouette of a sprite (hit flash / dodge afterimages), built once on demand
@@ -181,6 +215,25 @@ function drawCrop(c, name, dx, dy, dw, dh, mode = 'cover', fx = 0.5, fy = 0.5) {
     dx += (dw - nw) / 2; dy += (dh - nh) / 2; dw = nw; dh = nh;
   }
   c.drawImage(im, sx, sy, sw, sh, dx, dy, dw, dh);
+  return true;
+}
+
+// Draw a VFX sprite centred on (x, y) at width w (height keeps the aspect unless o.h is given).
+// o: alpha, rot (radians), flip (mirror horizontally, applied before rot), ax/ay (anchor 0..1, default
+// centre), sy (extra vertical squash, e.g. to lay a swirl flat on the ground), add (additive glow).
+// Returns false when the image isn't loaded so callers can fall back to the old vector drawing.
+function drawVfx(c, name, x, y, w, o = {}) {
+  if (!Assets.vfxReady(name)) return false;
+  const im = Assets.vfx[name], h = o.h || w * im.naturalHeight / im.naturalWidth;
+  c.save();
+  if (o.alpha != null) c.globalAlpha *= clamp(o.alpha, 0, 1);
+  if (o.add) c.globalCompositeOperation = 'lighter';
+  c.translate(x, y);
+  if (o.flip) c.scale(-1, 1);
+  if (o.sy) c.scale(1, o.sy);
+  if (o.rot) c.rotate(o.rot);
+  c.drawImage(im, -w * (o.ax != null ? o.ax : 0.5), -h * (o.ay != null ? o.ay : 0.5), w, h);
+  c.restore();
   return true;
 }
 

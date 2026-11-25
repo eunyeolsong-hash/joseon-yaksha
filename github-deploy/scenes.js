@@ -103,7 +103,7 @@ function neonButton(c, x, y, w, h, label, opt = {}) { // 그림 1·9 style crims
 // 오프닝 튜토리얼 카툰 컷신 (기획서 §3-2, 그림 7): 휘모리 배경 + 월광대 주요 인물 4인 + 사건의 시작
 const PROLOGUE = [
   { panels: [
-    { rect: [30, 30, 560, 230], caption: '2026년 한양. 인간왕과 도깨비왕의 합의로, 인간과 요괴(수인)가 함께 살아온 도시.', draw: panelImg('bg.title', 0.55, 0.25) },
+    { rect: [30, 30, 560, 230], caption: '2026년 한양. 인간왕과 도깨비왕의 합의로, 인간과 요괴(수인)가 함께 살아온 도시.', draw: panelImg('open.hanyang', 0.5, 0.5) },
     { rect: [610, 30, 320, 230], caption: '도깨비왕이 숨을 거두자, 칠정의 구슬 일곱 개가 전국으로 흩어졌다.',
       draw(c, w, h, t) {
         panelImg('open.city', 0.8, 0.2, 'rgba(20,0,30,0.55)')(c, w, h, t);
@@ -339,12 +339,6 @@ class DialogueScene {
       const bounce = active ? -Math.max(0, 1 - this.lt * 5) * 10 : 0;
       const h = 560 * (sp.small || 1), top = 22 + (560 - h) + bounce + (active ? 0 : 16);
       drawBust(c, sp.bust, x, top, active ? h : h * 0.97, { alpha: active ? 1 : 0.35, tint: sp.tint, glow: active || sp.tint ? (sp.glow || (STYLES[key] || {}).aura) : null });
-      if (active && L.emo && L.emo !== 'normal' && ATLAS[`face.${key}.${L.emo}`]) { // 표정 모음 inset
-        const fx = x + (x < W / 2 ? 132 : -132), fy = 96;
-        c.save(); c.shadowColor = '#ff4a9a'; c.shadowBlur = 14; circle(c, fx, fy, 46); c.fillStyle = '#1a0a1e'; c.fill(); c.restore();
-        drawFaceCircle(c, key, L.emo, fx, fy, 44, { fy: 0.3 });
-        c.strokeStyle = '#ff8ab8'; c.lineWidth = 2.5; circle(c, fx, fy, 44); c.stroke();
-      }
     }
     const bx = 34, by = 382, bw = 892, bh = 140;
     neonPanel(c, bx, by, bw, bh, { r: 6, fill: 'rgba(24,8,28,0.86)' });

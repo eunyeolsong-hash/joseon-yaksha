@@ -18,7 +18,7 @@ const CHAR_DATA = {
       { dur: 0.34, hitAt: 0.11, range: 80, height: 60, mult: 1.0, push: 140, lunge: 120, frame: 'hocheol_stance', fx: 'punch' },
       { dur: 0.5, hitAt: 0.2, range: 106, height: 72, mult: 1.7, push: 320, lunge: 260, frame: 'hocheol_cast', fx: 'pipe' },
     ],
-    frames: { idle: 'hocheol_side', ready: 'hocheol_idle', air: 'hocheol_stance', dodge: 'hocheol_dash', skill: 'hocheol_cast', tagin: 'hocheol_punch', ult: ['hocheol_aura', 'hocheol_ult'], grab: 'hocheol_punch' },
+    frames: { idle: 'hocheol_side', walk: 'hocheol_stance', ready: 'hocheol_idle', air: 'hocheol_stance', dodge: 'hocheol_dash', skill: 'hocheol_cast', tagin: 'hocheol_punch', ult: ['hocheol_aura', 'hocheol_ult'], grab: 'hocheol_punch' },
     skill: { name: '흑연호박', hanja: '黑煙虎縛', cd: 8, desc: '검은 연기 호랑이로 광역 피해 + 2초 속박' },
     ult: { name: '흑연호왕', hanja: '黑煙虎王', desc: '연기 흑호 돌진 후 폭발' },
     passive: { name: '맹호의 위압', hanja: '猛虎之威' },
@@ -76,7 +76,7 @@ const pairKey = (a, b) => [a, b].sort().join('+');
 
 // ---------------- effects ----------------
 class Effects {
-  constructor() { this.p = []; this.txt = []; this.sl = []; this.rg = []; this.gh = []; this.t = 0; this.lastGhost = 0; }
+  constructor() { this.p = []; this.txt = []; this.sl = []; this.rg = []; this.gh = []; this.vf = []; this.t = 0; this.lastGhost = 0; }
   update(dt) {
     this.t += dt;
     for (const p of this.p) {
@@ -91,6 +91,15 @@ class Effects {
     this.sl = this.sl.filter(e => e.life > 0);
     this.rg = this.rg.filter(e => e.life > 0);
     this.gh = this.gh.filter(e => e.life > 0);
+    for (const v of this.vf) { v.life -= dt; v.x += v.vx * dt; v.y += v.vy * dt; v.rot += v.spin * dt; }
+    this.vf = this.vf.filter(v => v.life > 0);
+  }
+  // Painted VFX sprite (vfx_*.webp from the VFX asset sheet). w = width in world px.
+  // o: life, s0 → s1 (scale over life), fin (fade-in time), alpha, rot, spin, flip, ax/ay, sy, add, vx/vy, h
+  vfx(name, x, y, w, o = {}) {
+    if (this.vf.length > 60 || !Assets.vfxReady(name)) return;
+    const life = o.life || 0.5;
+    this.vf.push(Object.assign({ name, x, y, w, s0: 1, s1: 1.15, fin: 0.06, alpha: 1, rot: 0, spin: 0, vx: 0, vy: 0 }, o, { life, max: life }));
   }
   part(x, y, o) {
     if (this.p.length > 600) return;
@@ -127,6 +136,11 @@ class Effects {
       c.stroke();
     }
     c.globalAlpha = 1;
+    for (const v of this.vf) {
+      const age = v.max - v.life, k = age / v.max, s = lerp(v.s0, v.s1, easeOut(k));
+      const a = v.alpha * Math.min(1, v.fin > 0 ? age / v.fin : 1) * Math.min(1, v.life / (v.max * 0.45));
+      drawVfx(c, v.name, v.x, v.y, v.w * s, { alpha: a, rot: v.rot, flip: v.flip, ax: v.ax, ay: v.ay, sy: v.sy, add: v.add, h: v.h ? v.h * s : 0 });
+    }
     for (const p of this.p) {
       const k = p.life / p.max;
       c.globalAlpha = Math.min(1, k * 1.5); c.fillStyle = p.color; c.strokeStyle = p.color;
@@ -212,6 +226,12 @@ class Player extends Fighter {
     this.st += dt;
     for (const k of ['inv', 'skillCd', 'sealed', 'bound', 'dodgeCd', 'flash', 'dropT', 'combatT', 'buffAtk', 'buffDef']) if (this[k] > 0) this[k] = Math.max(0, this[k] - dt);
     if (this.dead) { this.vx *= Math.pow(0.05, dt); this.physics(dt); return; }
+    if (this.key === 'hocheol') { // 맹호의 위압: 적이 무리 지어 다가오면(보스 둘 다 근접) 공격력 +10% · 받는 피해 -10%
+      const near = b.liveBosses().filter(e => Math.abs(e.x - this.x) < 300).length;
+      const on = near >= 2;
+      if (on && !this.tigerAura) { b.fx.text(this.x, this.y - this.h - 34, '맹호의 위압!', '#c9a6ff', 18); b.skillCard(this.key, 'passive', this.d.passive.name); b.fx.vfx('hocheol_eyes', this.x, this.y - this.h * 0.62, 260, { life: 0.6, s0: 0.7, s1: 1.3 }); }
+      this.tigerAura = on;
+    }
     // design doc: HP slowly drains over time (신상패딩 slows this)
     if (b.state === 'fight') this.hp = Math.max(1, this.hp - this.maxHp * 0.0012 * dt);
     const dir = (I.held('right') ? 1 : 0) - (I.held('left') ? 1 : 0);
@@ -291,6 +311,7 @@ class Player extends Fighter {
     if (this.key === 'seondal' && this.fanStacks >= 5) { // 풍류의 잔상: 5타 적중마다 다음 공격 강화(관통 + 추가 피해)
       this.fanStacks = 0; mult *= 1.6; range += 90; pierce = true;
       fx.text(this.x, this.y - this.h - 34, '풍류의 잔상!', '#9fe0ff', 18);
+      fx.vfx('seondal_aura', this.x, this.y - this.h * 0.5, 170, { life: 0.55, s0: 0.7, s1: 1.35, spin: 5 });
       b.skillCard(this.key, 'passive', this.d.passive.name);
     }
     switch (a.fx) {
@@ -300,6 +321,7 @@ class Player extends Fighter {
       case 'pipe': fx.ring(this.x + this.facing * 58, cy, 46, '#ffa040', 0.2); fx.smoke(this.x + this.facing * 60, cy, 6, 'rgba(25,22,32,0.7)', 16); break;
       case 'fan': case 'fanBig':
         fx.slash(x + this.facing * 10, cy, this.facing, a.fx === 'fanBig' ? 72 : 52, Math.random() < 0.5, pierce ? '#ffffff' : '#9fe0ff');
+        if (a.fx === 'fanBig' || pierce) fx.vfx('seondal_crescent', x + this.facing * 34, cy, pierce ? 190 : 150, { flip: this.facing < 0, life: 0.3, s0: 0.85, s1: 1.2 });
         for (let i = 0; i < (a.fx === 'fanBig' || pierce ? 10 : 5); i++) fx.part(this.x + this.facing * rand(30, range), cy + rand(-24, 24), { vx: this.facing * rand(200, 420), vy: rand(-30, 30), life: 0.3, size: 2.5, color: '#bfeaff', shape: 'line', drag: 0.2 });
         Sfx.play('wind'); break;
       case 'sword': case 'swordUp': fx.slash(x, cy, this.facing, 54, a.fx === 'swordUp', '#ffc0e0'); break;
@@ -359,12 +381,14 @@ class Player extends Fighter {
     while (this.grabHits < 3 && this.st >= times[this.grabHits]) {
       this.grabHits++;
       b.damageBoss(this, e, { mult: 0.75 }); b.fx.impact(e.x, e.y - 64);
+      b.fx.vfx('dongmin_grapple', e.x - this.facing * 6, e.y - 70, 140, { flip: this.facing < 0, life: 0.26, s0: 0.8, s1: 1.1 });
     }
     if (this.grabHits === 3 && this.st >= 0.7) {
       this.grabHits = 4;
       // design doc: 단일 대상 연속 피해 + 방어력 15% 감소 + 2초간 기절
       b.damageBoss(this, e, { mult: 1.6, stun: 2, defDown: 0.15, defT: 6 });
       b.shake(10); b.fx.ring(e.x, e.y, 90, '#ffd27a', 0.35, true); b.fx.dust(e.x, e.y);
+      b.fx.vfx('dongmin_slam', e.x, e.y + 6, 230, { ay: 0.88, life: 0.6, s0: 0.7, s1: 1.15 });
       b.fx.text(e.x, e.y - e.h - 40, '방어력 -15% · 기절', '#ffd27a', 16, 1.2);
       Sfx.play('boom');
     }
@@ -372,7 +396,7 @@ class Player extends Fighter {
   }
   tryUlt() {
     if (this.ult < 100) return;
-    this.ult = 0; this.setState('ult'); this.ultStage = 0; this.ultHit = new Set(); this.ultTick = 0; this.inv = 99; this.combatT = 3;
+    this.ult = 0; this.setState('ult'); this.ultStage = 0; this.ultFrenzy = false; this.ultHit = new Set(); this.ultTick = 0; this.inv = 99; this.combatT = 3;
     this.b.ultCinematic(this);
     Sfx.play('ult');
   }
@@ -404,9 +428,11 @@ class Player extends Fighter {
       for (const e of b.liveBosses()) {
         if (this.ultHit.has(e) || !rectsOverlap(this.frontRect(90, 100, -40), e.rect())) continue;
         this.ultHit.add(e); b.damageBoss(this, e, { mult: 1.2 }); b.fx.slash(e.x, e.y - 64, this.facing, 70, false, '#ff4a4a');
+        b.fx.vfx('dongmin_xslash', e.x, e.y - 66, 210, { flip: this.facing < 0, life: 0.42, s0: 0.75, s1: 1.2 });
       }
     } else if (s < 1.25) {
       this.vx = 0; this.ultTick -= dt;
+      if (!this.ultFrenzy) { this.ultFrenzy = true; b.fx.vfx('dongmin_frenzy', this.x, this.y - 72, 330, { life: 0.95, fin: 0.12, s0: 0.85, s1: 1.12, flip: this.facing < 0 }); }
       if (this.ultTick <= 0) {
         this.ultTick = 0.1;
         const r = { x: this.x - 170, y: this.y - 160, w: 340, h: 170 };
@@ -422,6 +448,7 @@ class Player extends Fighter {
       for (const e of b.liveBosses()) if (rectsOverlap(r, e.rect())) b.damageBoss(this, e, { mult: 4.0, stun: 3 });
       b.fx.slash(this.x + this.facing * 70, this.y - 40, this.facing, 110, false, '#ff3030');
       b.fx.ring(this.x + this.facing * 80, GROUND_Y, 160, '#ff5050', 0.5, true);
+      b.fx.vfx('dongmin_cleave', this.x + this.facing * 80, GROUND_Y + 8, 210, { ay: 0.94, life: 0.7, s0: 0.8, s1: 1.1 });
       b.shake(18); Sfx.play('boom');
     } else if (s >= 1.9) { this.state = 'idle'; this.inv = 0.3; }
   }
@@ -441,6 +468,7 @@ class Player extends Fighter {
       return this.st < 0.35 ? u[0] : u[1];
     }
     if (!this.onGround && s !== 'dead') return F.air;
+    if (s === 'move' && F.walk) return F.walk; // 걷기: 정면으로 선 자세 대신 옆으로 몸을 튼 보행 자세
     if (s === 'idle' && this.key === 'hocheol' && this.combatT <= 0 && Math.floor((t || 0) / 3) % 3 === 2) return 'hocheol_pipe';
     return this.combatT > 0 && s !== 'dead' ? F.ready : F.idle;
   }
@@ -463,6 +491,11 @@ class Player extends Fighter {
   }
   draw(c, t) {
     this.drawShadow(c);
+    if (!this.dead) { // painted passive auras (VFX sheet ①)
+      if (this.key === 'seondal' && this.fanStacks >= 5) drawVfx(c, 'seondal_aura', this.x, this.y - this.h * 0.5, 150, { rot: t * 2.5, alpha: 0.6 + Math.sin(t * 6) * 0.15 });
+      if (this.key === 'hocheol' && this.tigerAura) drawVfx(c, 'hocheol_eyes', this.x, this.y - this.h * 0.62, 230, { alpha: 0.55 + Math.sin(t * 4) * 0.12 });
+      if (this.key === 'simcheong' && this.hp / this.maxHp <= 0.4) drawVfx(c, 'simcheong_regen', this.x, this.y + 6, 130, { ay: 0.96, alpha: 0.5 + Math.sin(t * 5) * 0.15 });
+    }
     if (this.buffAtk > 0 || this.buffDef > 0) {
       c.strokeStyle = `rgba(255,200,120,${0.4 + Math.sin(t * 8) * 0.2})`; c.lineWidth = 2;
       c.beginPath(); c.ellipse(this.x, this.y - 2, 30, 8, 0, 0, Math.PI * 2); c.stroke();
@@ -486,7 +519,7 @@ class Player extends Fighter {
 
 // ---------------- player-owned zones ----------------
 class SmokeTiger { // 흑연호박: smoke tiger binds enemies in front
-  constructor(b, owner, x, y) { this.b = b; this.o = owner; this.x = x; this.y = y; this.dir = owner.facing; this.t = 0; this.ticks = 0; this.done = false; this.r = 130; }
+  constructor(b, owner, x, y) { this.b = b; this.o = owner; this.x0 = owner.x + owner.facing * 30; this.x = x; this.y = y; this.dir = owner.facing; this.t = 0; this.ticks = 0; this.done = false; this.r = 130; }
   update(dt) {
     this.t += dt;
     if (this.ticks < 3 && this.t >= 0.15 + this.ticks * 0.3) {
@@ -499,6 +532,13 @@ class SmokeTiger { // 흑연호박: smoke tiger binds enemies in front
   }
   draw(c) {
     const k = this.t < 0.2 ? this.t / 0.2 : this.t > 1.0 ? Math.max(0, 1 - (this.t - 1.0) / 0.3) : 1;
+    if (Assets.vfxReady('hocheol_head') && Assets.vfxReady('hocheol_chains')) {
+      // 흑호 형상 연기 투사체 flies out of the pipe, then 검은 연기 사슬 bind the area
+      const fly = clamp(this.t / 0.22, 0, 1);
+      if (this.t < 0.45) drawVfx(c, 'hocheol_head', lerp(this.x0, this.x, easeOut(fly)), this.y - 95, 230, { flip: this.dir < 0, alpha: this.t < 0.25 ? 1 : 1 - (this.t - 0.25) / 0.2, ax: 0.75 });
+      if (this.t > 0.12) drawVfx(c, 'hocheol_chains', this.x, this.y - 92, 250, { alpha: k * Math.min(1, (this.t - 0.12) / 0.15), rot: Math.sin(this.t * 3) * 0.06, flip: this.dir < 0 });
+      return;
+    }
     drawSmokeTiger(c, this.x, this.y - 95, this.dir, 1, k, this.t);
   }
 }
@@ -514,7 +554,8 @@ class TigerRush { // 흑연호왕: smoke tiger charges forward then explodes
       b.fx.smoke(this.x - this.dir * 50, this.y - 70, 2, 'rgba(18,16,24,0.7)', 30);
       if (this.t > 0.75 || this.x < 40 || this.x > WORLD_W - 40) {
         this.exploded = true; this.t = 0;
-        b.fx.ring(this.x, this.y - 70, 220, '#ff9a3c', 0.5); b.fx.smoke(this.x, this.y - 70, 14, 'rgba(18,16,24,0.85)', 90);
+        b.fx.ring(this.x, this.y - 70, 220, '#b47cff', 0.5); b.fx.smoke(this.x, this.y - 70, 14, 'rgba(18,16,24,0.85)', 90);
+        b.fx.vfx('hocheol_roar', this.x, GROUND_Y + 10, 400, { ay: 0.94, life: 0.95, s0: 0.75, s1: 1.1, flip: this.dir < 0 });
         b.shake(12); Sfx.play('boom');
         for (const e of b.liveBosses()) if (Math.abs(e.x - this.x) < 220) b.damageBoss(this.o, e, { mult: 2.0, push: 200, noCount: true });
       }
@@ -522,10 +563,13 @@ class TigerRush { // 흑연호왕: smoke tiger charges forward then explodes
   }
   draw(c) {
     if (this.exploded) return;
+    // 흑연 맹호 발톱 할퀴기: the painted claw swipe faces left, so mirror it when charging right
+    if (drawVfx(c, 'hocheol_claw', this.x - this.dir * 80, this.y - 92, 330, { flip: this.dir > 0, alpha: Math.min(1, this.t / 0.08) })) return;
     drawSmokeTiger(c, this.x, this.y - 100, this.dir, 1.25, 1, this.t * 3);
   }
 }
 function drawSmokeTiger(c, x, y, dir, s, alpha, t) {
+  if (drawVfx(c, 'hocheol_head', x, y, 230 * s, { flip: dir < 0, alpha: alpha * (0.9 + Math.sin(t * 6) * 0.1) })) return;
   c.save(); c.globalAlpha = alpha * 0.92; c.translate(x, y); c.scale(dir * s, s);
   c.fillStyle = '#121018';
   for (let i = 0; i < 9; i++) { const a = i / 9 * 6.28 + t * 2; circle(c, Math.cos(a) * 52, Math.sin(a) * 34, 34 + Math.sin(t * 5 + i) * 6); c.fill(); }
@@ -545,7 +589,10 @@ function drawSmokeTiger(c, x, y, dir, s, alpha, t) {
 
 // ---------------- 김선달 · 심청이 skills ----------------
 class WindGust { // 만리추풍: wind blast travels forward, pierces, then explodes and pushes enemies away
-  constructor(b, o) { this.b = b; this.o = o; this.dir = o.facing; this.x = o.x + this.dir * 50; this.y = o.y - 60; this.t = 0; this.hitT = new Map(); this.done = false; this.exploded = false; }
+  constructor(b, o) {
+    this.b = b; this.o = o; this.dir = o.facing; this.x = o.x + this.dir * 50; this.y = o.y - 60; this.t = 0; this.hitT = new Map(); this.done = false; this.exploded = false;
+    b.fx.vfx('seondal_crescent', this.x + this.dir * 20, this.y, 170, { flip: this.dir < 0, life: 0.3, s0: 0.8, s1: 1.25 });
+  }
   update(dt) {
     const b = this.b; this.t += dt;
     if (!this.exploded) {
@@ -559,12 +606,15 @@ class WindGust { // 만리추풍: wind blast travels forward, pierces, then expl
       if (this.t > 0.75 || this.x < 40 || this.x > WORLD_W - 40) {
         this.exploded = true; this.t = 0;
         b.fx.ring(this.x, this.y, 150, '#9fe0ff', 0.45); b.shake(8); Sfx.play('boom');
+        b.fx.vfx('seondal_burst', this.x, this.y, 300, { life: 0.55, s0: 0.6, s1: 1.3 });
         for (const e of b.liveBosses()) if (Math.abs(e.x - this.x) < 150) b.damageBoss(this.o, e, { mult: 1.3, push: 360 });
       }
     } else if (this.t > 0.3) this.done = true;
   }
   draw(c) {
     if (this.exploded) return;
+    // 풍압 화살 투사체: the painted streak's tip leads, its tail trails back toward 김선달
+    if (drawVfx(c, 'seondal_blade', this.x + this.dir * 30, this.y, 210, { flip: this.dir < 0, rot: Math.PI + 0.63, ax: 0.1, ay: 0.95, alpha: Math.min(1, this.t / 0.06) })) return;
     c.save(); c.translate(this.x, this.y); c.scale(this.dir, 1);
     for (let i = 0; i < 4; i++) {
       c.strokeStyle = `rgba(190,235,255,${0.75 - i * 0.15})`; c.lineWidth = 6 - i;
@@ -587,12 +637,15 @@ class FanVortex { // 천풍만리: 회오리가 적을 끌어당겨 지속 피�
     if (!this.burst && this.t >= 2.0) {
       this.burst = true; b.shake(16); Sfx.play('boom');
       b.fx.ring(this.x, this.y - 100, 260, '#9fe0ff', 0.55); b.fx.ring(this.x, this.y, 260, '#ffffff', 0.5, true);
+      b.fx.vfx('seondal_burst', this.x, this.y - 110, 480, { life: 0.65, s0: 0.6, s1: 1.3 });
       for (const e of b.liveBosses()) if (Math.abs(e.x - this.x) < 240) b.damageBoss(this.o, e, { mult: 3.0, push: 300, stun: 1 });
     }
     if (this.t > 2.3) this.done = true;
   }
   draw(c) {
     const k = this.t < 0.2 ? this.t / 0.2 : this.t > 2.0 ? Math.max(0, 1 - (this.t - 2.0) / 0.3) : 1;
+    const grow = easeOut(clamp(this.t / 0.35, 0, 1));
+    if (drawVfx(c, 'seondal_tornado', this.x + Math.sin(this.t * 9) * 6, this.y + 12, 300 * (1 + Math.sin(this.t * 22) * 0.04), { ay: 0.96, alpha: k, h: 330 * (0.3 + 0.7 * grow) })) return;
     c.save(); c.globalAlpha = k;
     for (let i = 0; i < 9; i++) {
       const yy = this.y - i * 26, rw = 40 + i * 14, ph = this.t * 9 + i * 0.7;
@@ -619,6 +672,8 @@ class WaterSlash { // 심연수류: 검은 물줄기가 전방을 관통 — 적
   }
   draw(c) {
     const k = this.t < 0.4 ? 1 : Math.max(0, 1 - (this.t - 0.4) / 0.15), x1 = this.x0 + this.dir * this.len;
+    // 고압 직선 수류 참격: tip of the painted stream at the front, its length follows the jet
+    if (this.len > 20 && drawVfx(c, 'simcheong_stream', x1, this.y, Math.max(120, this.len * 0.93), { flip: this.dir < 0, rot: Math.PI + 0.51, ax: 0.04, ay: 0.95, alpha: k })) return;
     c.save(); c.globalAlpha = k; c.lineCap = 'round';
     c.strokeStyle = 'rgba(20,10,40,0.85)'; c.lineWidth = 34; seg(c, this.x0, this.y, x1, this.y);
     c.strokeStyle = 'rgba(80,190,255,0.85)'; c.lineWidth = 16; seg(c, this.x0, this.y, x1, this.y);
@@ -639,6 +694,7 @@ class LotusField { // 흑련개화: 흑련 영역 — 끌어당김 + 지속 피�
     if (!this.slam && this.t >= 1.3) {
       this.slam = true; b.shake(20); Sfx.play('boom');
       b.fx.ring(this.x, this.y, 260, '#ff6aa8', 0.6, true); b.fx.ring(this.x, this.y - 60, 200, '#b07cff', 0.5);
+      b.fx.vfx('simcheong_descent', this.x, this.y + 12, 360, { ay: 0.93, life: 0.85, s0: 0.8, s1: 1.1 });
       for (const e of b.liveBosses()) if (Math.abs(e.x - this.x) < 240) {
         const missing = (e.maxHp - e.hp) / e.maxHp;
         b.damageBoss(this.o, e, { mult: 3.0 + missing * 4, stun: 2.5, yogiPart: true });
@@ -648,6 +704,12 @@ class LotusField { // 흑련개화: 흑련 영역 — 끌어당김 + 지속 피�
   }
   draw(c) {
     const k = this.t < 0.2 ? this.t / 0.2 : this.t > 1.4 ? Math.max(0, 1 - (this.t - 1.4) / 0.3) : 1, bloom = easeOut(clamp(this.t / 0.6, 0, 1));
+    if (Assets.vfxReady('simcheong_whirl') && Assets.vfxReady('simcheong_lotus')) {
+      // 심해 소용돌이 견인 (flat on the ground, spinning) under the 거대 흑련 만개 영역
+      drawVfx(c, 'simcheong_whirl', this.x, this.y - 4, 520 * (0.5 + 0.5 * bloom), { sy: 0.32, rot: this.t * 5, alpha: k * 0.9 });
+      drawVfx(c, 'simcheong_lotus', this.x, this.y + 18, 430 * (0.3 + 0.7 * bloom), { ay: 0.78, alpha: k });
+      return;
+    }
     c.save(); c.globalAlpha = k * 0.9; c.translate(this.x, this.y);
     c.fillStyle = 'rgba(30,10,40,0.55)'; c.beginPath(); c.ellipse(0, 0, 240, 50, 0, 0, Math.PI * 2); c.fill();
     for (let i = 0; i < 8; i++) { // 검은 연꽃 꽃잎
@@ -696,6 +758,7 @@ class Synergy {
       if (this.t > 1.25 && !this.final) {
         this.final = true; b.shake(22); Sfx.play('boom');
         b.fx.ring(this.cx, GROUND_Y, 240, '#ff4a7a', 0.6, true);
+        b.fx.vfx('simcheong_descent', this.cx, GROUND_Y + 12, 340, { ay: 0.93, life: 0.8, s0: 0.8, s1: 1.1 });
         for (const e of b.liveBosses()) if (this.inRange(e, 220)) { const miss = (e.maxHp - e.hp) / e.maxHp; b.damageBoss(this.src, e, { mult: 3.5 + miss * 6, stun: 2 }); }
         for (const p of b.party) if (!p.dead) { p.hp = Math.min(p.maxHp, p.hp + p.maxHp * 0.05); b.fx.text(p === b.player ? p.x : this.px, GROUND_Y - 140, '+회복', '#9fffb0', 15); }
       }
@@ -713,7 +776,10 @@ class Synergy {
   draw(c, t) {
     const k = this.cfg.kind, a = this.t < 0.15 ? this.t / 0.15 : this.t > 1.6 ? Math.max(0, 1 - (this.t - 1.6) / 0.25) : 1;
     c.save(); c.globalAlpha = a;
-    if (k === 'vortex' || k === 'storm') {
+    if ((k === 'vortex' || k === 'storm') && Assets.vfxReady('seondal_tornado')) {
+      if (k === 'storm') drawVfx(c, 'simcheong_whirl', this.cx, GROUND_Y - 4, 480, { sy: 0.32, rot: this.t * 6, alpha: 0.85 });
+      drawVfx(c, 'seondal_tornado', this.cx + Math.sin(this.t * 9) * 6, GROUND_Y + 12, 300, { ay: 0.96, h: 330 * (0.3 + 0.7 * easeOut(clamp(this.t / 0.35, 0, 1))) });
+    } else if (k === 'vortex' || k === 'storm') {
       for (let i = 0; i < 10; i++) {
         const yy = GROUND_Y - i * 24, rw = 50 + i * 16, ph = this.t * 10 + i * 0.6;
         c.strokeStyle = k === 'storm' ? `rgba(${60 + i * 10},${150 + i * 6},255,${0.75 - i * 0.05})` : `rgba(200,240,255,${0.75 - i * 0.05})`; c.lineWidth = 5;
@@ -757,12 +823,13 @@ class Assist {
     } else if (this.state === 'grab') {
       e.grabbed = 0.2; this.x = e.x - this.facing * 30;
       const times = [0.1, 0.25, 0.4];
-      while (this.hits < 3 && this.st >= times[this.hits]) { this.hits++; b.damageBoss(this.dm, e, { mult: 0.8 }); b.fx.impact(e.x, e.y - 64); }
+      while (this.hits < 3 && this.st >= times[this.hits]) { this.hits++; b.damageBoss(this.dm, e, { mult: 0.8 }); b.fx.impact(e.x, e.y - 64); b.fx.vfx('dongmin_grapple', e.x - this.facing * 6, e.y - 70, 140, { flip: this.facing < 0, life: 0.26, s0: 0.8, s1: 1.1 }); }
       if (this.hits === 3 && this.st >= 0.65) {
         this.hits = 4;
         // design doc: 요기 무력화 해제 + 2초 기절 + 방어력 30% 감소
         b.damageBoss(this.dm, e, { mult: 1.4, stun: 2, defDown: 0.3, defT: 6, ignoreArmor: true });
         b.shake(12); b.fx.ring(e.x, e.y, 100, '#ffd27a', 0.4, true);
+        b.fx.vfx('dongmin_slam', e.x, e.y + 6, 240, { ay: 0.88, life: 0.6, s0: 0.7, s1: 1.15 });
         b.fx.text(e.x, e.y - e.h - 44, '무기 꺾기! 방어력 -30%', '#ffd27a', 18, 1.3);
         Sfx.play('boom');
         const p = b.player;
@@ -801,7 +868,9 @@ class Proj {
   draw(c) {
     c.save(); c.translate(this.x, this.y);
     c.globalAlpha = Math.min(1, this.life * 3);
-    if (this.kind === 'ganjang') {
+    if (this.kind === 'ganjang' && drawVfx(c, 'boss_ganjang', 0, 0, 170, { flip: this.dir < 0, ax: 0.7 })) { /* 간장 연속 참격 */ }
+    else if (this.kind === 'makya' && drawVfx(c, 'boss_makya', 0, 0, 150, { rot: Math.atan2(this.vy, this.vx), ax: 0.72 })) { /* 막야 구속 참격 */ }
+    else if (this.kind === 'ganjang') {
       c.scale(this.dir, 1);
       c.fillStyle = 'rgba(255,80,30,0.3)'; c.beginPath(); c.ellipse(-8, 0, 34, 44, 0, 0, Math.PI * 2); c.fill();
       c.fillStyle = '#ff5a2a'; c.beginPath(); c.arc(0, 0, 40, -1.3, 1.3); c.arc(-15, 0, 34, 1.2, -1.2, true); c.closePath(); c.fill();
@@ -1135,15 +1204,19 @@ class Battle {
     }
     let dmg = src.atk * (o.mult || 1), crit = false;
     if (src.buffAtk > 0) dmg *= 1.1; // 흑풍맹호격 공격력 +10%
+    if (src.tigerAura) dmg *= 1.1;   // 맹호의 위압
     if (src.key === 'dongmin') { // 해체 본능: +3% per 10 hits on the same target, every 5th hit is a +30% 급소 일격
       e.dmHits++;
       dmg *= 1 + 0.03 * Math.min(10, Math.floor(e.dmHits / 10));
-      if (e.dmHits % 5 === 0) { dmg *= 1.3; crit = true; }
+      if (e.dmHits % 5 === 0) { dmg *= 1.3; crit = true; this.fx.vfx('dongmin_mark', e.x, e.y - e.h * 0.55, 120, { life: 0.5, s0: 1.7, s1: 0.95, spin: 3 }); }
     }
     if (src.key === 'seondal' && o.basic) src.fanStacks = Math.min(5, src.fanStacks + 1); // 풍류의 잔상 축적
     if (src.key === 'simcheong') { // 인당수의 한: 체력 40% 이하 치명 피해 +20%, 젖은 적 타격 시 피해의 4% 회복
       if (src.hp / src.maxHp <= 0.4) { dmg *= 1.2; crit = true; }
-      if (e.soakT > 0 && src.hp < src.maxHp) src.hp = Math.min(src.maxHp, src.hp + dmg * 0.04);
+      if (e.soakT > 0 && src.hp < src.maxHp) {
+        src.hp = Math.min(src.maxHp, src.hp + dmg * 0.04);
+        if (src.hp / src.maxHp <= 0.4 && this.real - (src.lastRegenFx || 0) > 0.8) { src.lastRegenFx = this.real; this.fx.vfx('simcheong_regen', src.x, src.y + 6, 120, { ay: 0.96, life: 0.6, s0: 0.8, s1: 1.2 }); }
+      }
     }
     if (o.yogiPart) { // 심청이의 수류 술법은 요기 기반 — 막야가 절반을 삼킨다
       dmg *= 0.5;
@@ -1182,6 +1255,7 @@ class Battle {
     }
     if (p.inv > 0) return 'inv';
     if (p.buffDef > 0) dmg = Math.round(dmg * 0.75); // 시너지 방어 버프
+    if (p.tigerAura) dmg = Math.round(dmg * 0.9);    // 맹호의 위압
     p.hp -= dmg; p.flash = 0.12; p.inv = 0.7; p.ult = Math.min(100, p.ult + dmg / 7);
     this.stats.dmgTaken += dmg;
     const dir = sign(p.x - (o.from != null ? o.from : p.x - p.facing)) || -p.facing;
@@ -1193,7 +1267,10 @@ class Battle {
       p.sealed = 4; this.fx.text(p.x, p.y - p.h - 40, '요기 봉인!', '#c49bff', 18);
       this.tryAssist();
     }
-    if (o.bind) { p.bound = Math.max(p.bound, o.bind); this.fx.text(p.x, p.y - p.h - 60, '속박!', '#b07cff', 18); }
+    if (o.bind) {
+      p.bound = Math.max(p.bound, o.bind); this.fx.text(p.x, p.y - p.h - 60, '속박!', '#b07cff', 18);
+      this.fx.vfx('boss_seal', p.x, p.y + 10, 160, { ay: 0.82, life: o.bind + 0.2, fin: 0.12, s0: 0.7, s1: 1 }); // 봉마 구속 진
+    }
     if (p.hp <= 0) this.playerDown(p);
     return 'hit';
   }
@@ -1385,6 +1462,10 @@ class Battle {
       seg(c, h.x, h.y - 75, d.x, d.y - 75); c.setLineDash([]);
     }
     for (const e of this.bosses) e.draw(c, this.t);
+    if (this.player.key === 'dongmin') for (const e of this.bosses) { // 해체 본능 급소 조준 표식 — 5타째가 급소
+      const st = e.dmHits % 5;
+      if (e.alive && e.dmHits > 0 && st >= 2) drawVfx(c, 'dongmin_markS', e.x, e.y - e.h * 0.55, 34 + st * 9, { rot: this.real * 2, alpha: 0.35 + st * 0.15 });
+    }
     if (this.assist) this.assist.draw(c, this.t);
     if (this.synergy) this.synergy.draw(c, this.t);
     this.player.draw(c, this.t);
@@ -1418,6 +1499,7 @@ class Battle {
       c.fillStyle = `rgba(255,211,77,${0.08 + k * 0.15 + Math.sin(this.real * 20) * 0.04})`; c.fillRect(x0, y0, x1 - x0, 120);
       c.strokeStyle = 'rgba(255,220,120,0.7)'; c.lineWidth = 2; c.setLineDash([14, 10]);
       c.strokeRect(x0, y0, x1 - x0, 120); c.setLineDash([]);
+      drawVfx(c, 'boss_converge', bm.x, bm.y - 20, 110 + k * 170, { rot: this.real * 3, alpha: 0.4 + k * 0.6, add: true }); // 쌍검 에너지 수렴
       const g = c.createRadialGradient(bm.x, bm.y, 2, bm.x, bm.y, 30 + k * 40);
       g.addColorStop(0, '#fffbe6'); g.addColorStop(0.4, 'rgba(255,211,77,0.9)'); g.addColorStop(1, 'rgba(255,211,77,0)');
       c.fillStyle = g; circle(c, bm.x, bm.y, 30 + k * 40); c.fill();
@@ -1428,6 +1510,8 @@ class Battle {
       g.addColorStop(0, `rgba(255,200,60,${0.2 * k})`); g.addColorStop(0.5, `rgba(255,255,230,${0.95 * k})`); g.addColorStop(1, `rgba(255,200,60,${0.2 * k})`);
       c.fillStyle = g; c.fillRect(x0, y0 - wob, x1 - x0, 120 + wob * 2);
       c.fillStyle = `rgba(255,255,255,${0.9 * k})`; c.fillRect(x0, y0 + 50, x1 - x0, 20);
+      // 쌍검 에너지 광선: painted beam, muzzle (right edge of the art) at the twins
+      drawVfx(c, 'boss_beam', bm.x, y0 + 60, Math.max(600, x1 - x0 + 60), { h: 230, flip: bm.dir > 0, ax: 0.97, alpha: Math.min(1, k * 1.4) });
     }
   }
   drawCards(c) { // skill-art cards (player: left under the HUD, bosses: right under the HP bars)
