@@ -71,6 +71,8 @@ const ATLAS = {
   'open.city': ['opening', 300, 0, 724, 330],
   'open.bottom': ['opening', 0, 400, 1024, 176],
   'open.full': ['opening', 0, 0, 1024, 576],
+  'open.chapter1': ['map', 40, 290, 1450, 420],   // 월드맵(1920) 스테이지 경로 — 챕터 1 예고
+  'open.moon': ['title', 430, 0, 1060, 330],      // 타이틀 그림의 달·남산타워
   'open.hanyang': ['title', 560, 0, 760, 296], // 타이틀 그림 윗부분(달·남산타워·도시) — 로고·버튼 제외
   // --- backgrounds (1920-wide screens) ---
   'bg.title': ['title', 0, 0, 1920, 1080],
@@ -121,6 +123,13 @@ const SPRITES = {
 // Full standing figures (assets/busts, Vision cut-outs) for dialogue and cut-ins.
 // rel = on-screen height relative to a 180cm character; 'shadow' is the unnamed silhouette of 그림 8,
 // tinted per speaker for characters the doc has no art for (신령님, 박쥐 수인, 땅굴대장 …).
+// Walk / run cycles (frame sequences). name → { n: frame count, fps, s: draw scale, f: 1 = painted facing right }.
+// Files: <name>_0.png … <name>_<n-1>.png (transparent, same canvas size, feet on the bottom edge).
+// '<key>_walk' is used while moving in battle, '<key>_run' (or _walk) in the chase scene. Empty until the art arrives.
+const ANIMS = {};
+for (const [k, a] of Object.entries(ANIMS)) for (let i = 0; i < a.n; i++) SPRITES[`${k}_${i}`] = { s: a.s, f: a.f != null ? a.f : 1 };
+function animFrame(name, t) { const a = ANIMS[name]; return a ? `${name}_${Math.floor(t * a.fps) % a.n}` : null; }
+
 const BUSTS = { dongmin: 1.0, hocheol: 1.04, seondal: 1.0, simcheong: 0.95, haenim: 1.0, dalnim: 0.95, shadow: 0.9 };
 
 // Skill VFX cut out of 「캐릭터 스킬 VFX 에셋 시트」 (5 sheets × 5 effects, checkerboard keyed to alpha).
@@ -168,7 +177,7 @@ const Assets = {
     for (const [k, f] of Object.entries(IMG_FILES)) add(this.imgs, k, f + '?v=2');
     for (const k of Object.keys(SPRITES)) add(this.sprites, k, k + '.png?v=2');
     for (const k of Object.keys(BUSTS)) add(this.busts, k, k + '.png?v=2');
-    for (const k of VFX) add(this.vfx, k, 'vfx_' + k + '.webp?v=3');
+    for (const k of VFX) add(this.vfx, k, 'vfx_' + k + '.webp?v=4');
   },
   vfxReady(name) { const im = this.vfx[name]; return !!(im && im.complete && im.naturalWidth); },
   spriteReady(name) { const im = this.sprites[name]; return !!(im && im.complete && im.naturalWidth); },

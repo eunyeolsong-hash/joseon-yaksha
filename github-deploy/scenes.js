@@ -46,6 +46,15 @@ function panelBust(bgName, key, fy = 0.12, scale = 1.9) { // skill-art backgroun
     drawBust(c, key, w * 0.32, -h * fy, h * scale, { glow: STYLES[key].aura });
   };
 }
+// 보스 등장 첫 컷: 고해상도 달빛 배경 위에 해님·달님 전신 누끼 (저해상도 일러스트 확대 대신)
+function panelTwins(c, w, h, t) {
+  panelImg('open.moon', 0.5, 0.45, 'rgba(26,4,36,0.45)')(c, w, h, t);
+  const g = c.createLinearGradient(0, h * 0.35, 0, h); g.addColorStop(0, 'rgba(10,0,16,0)'); g.addColorStop(1, 'rgba(10,0,16,0.85)');
+  c.fillStyle = g; c.fillRect(0, 0, w, h);
+  const rise = easeOut(clamp(t / 0.8, 0, 1)) * 14;
+  drawBust(c, 'dalnim', w * 0.71, h * 0.06 - rise + 14, h * 1.75, { glow: '#b98cff', alpha: clamp(t / 0.5, 0, 1) });
+  drawBust(c, 'haenim', w * 0.58, h * 0.02 - rise + 14, h * 1.85, { glow: '#ff7a4a', alpha: clamp(t / 0.4, 0, 1) });
+}
 function caption(c, x, y, w, text) {
   c.font = `700 15px ${SANS}`;
   const lines = wrapText(c, text, w - 24);
@@ -55,16 +64,42 @@ function caption(c, x, y, w, text) {
   c.fillStyle = '#ffe8f2'; c.textAlign = 'left'; c.textBaseline = 'top';
   lines.forEach((l, i) => c.fillText(l, x + 12, y + 8 + i * 21));
 }
-function bubble(c, x, y, w, text, tail) {
-  c.font = `700 16px ${SANS}`;
-  const lines = wrapText(c, text, w - 32);
-  const h = lines.length * 22 + 20;
-  c.fillStyle = '#fff'; c.strokeStyle = '#111'; c.lineWidth = 2.5;
-  if (tail) { c.beginPath(); c.moveTo(x + w * 0.4, y + h - 4); c.lineTo(tail[0], tail[1]); c.lineTo(x + w * 0.55, y + h - 4); c.closePath(); c.fill(); c.stroke(); }
-  c.beginPath(); c.ellipse(x + w / 2, y + h / 2, w / 2 + 8, h / 2 + 6, 0, 0, Math.PI * 2); c.fill(); c.stroke();
-  if (tail) { c.beginPath(); c.moveTo(x + w * 0.4 + 2, y + h - 8); c.lineTo(x + w * 0.55 - 2, y + h - 8); c.strokeStyle = '#fff'; c.lineWidth = 4; c.stroke(); }
-  c.fillStyle = '#111'; c.textAlign = 'center'; c.textBaseline = 'top';
-  lines.forEach((l, i) => c.fillText(l, x + w / 2, y + 10 + i * 22));
+// Speech bubble: translucent ink panel with the speaker's colour as a neon rim, a tapered tail and an
+// optional name tab — the same language as the captions and the visual-novel text box.
+// o: { who: speaker key (name + colour), col, k: 0..1 pop-in }
+function bubble(c, x, y, w, text, tail, o = {}) {
+  const sp = o.who ? SPEAKERS[o.who] : null, col = o.col || (sp && sp.col) || '#ff8ab8', k = o.k != null ? o.k : 1;
+  c.save();
+  c.font = `700 15px ${SANS}`;
+  const lines = wrapText(c, text, w - 30), lh = 21, h = lines.length * lh + 22, r = 12;
+  const cx = x + w / 2, cy = y + h / 2, s = 0.9 + 0.1 * easeOut(k);
+  c.globalAlpha *= clamp(k * 1.6, 0, 1);
+  c.translate(cx, cy); c.scale(s, s); c.translate(-cx, -cy);
+  // tail: tapered wedge from the bubble's lower edge toward the speaker
+  let tb = null;
+  if (tail) {
+    const bx = clamp(tail[0], x + 26, x + w - 26), half = 11;
+    tb = [bx - half, bx + half];
+    c.beginPath(); c.moveTo(tb[0], y + h - 1); c.quadraticCurveTo(bx - 2, y + h + 10, tail[0], tail[1]); c.quadraticCurveTo(bx + 4, y + h + 8, tb[1], y + h - 1); c.closePath();
+    c.fillStyle = 'rgba(22,8,30,0.92)'; c.fill();
+    c.shadowColor = col; c.shadowBlur = 8; c.strokeStyle = col; c.lineWidth = 1.8; c.stroke(); c.shadowBlur = 0;
+  }
+  roundRect(c, x, y, w, h, r);
+  const g = c.createLinearGradient(0, y, 0, y + h); g.addColorStop(0, 'rgba(44,14,52,0.94)'); g.addColorStop(1, 'rgba(18,6,26,0.94)');
+  c.fillStyle = g; c.fill();
+  c.shadowColor = col; c.shadowBlur = 14; c.strokeStyle = col; c.lineWidth = 2; c.stroke(); c.shadowBlur = 0;
+  roundRect(c, x + 4, y + 4, w - 8, h - 8, r - 4); c.strokeStyle = 'rgba(255,255,255,0.10)'; c.lineWidth = 1; c.stroke();
+  if (tb) { c.strokeStyle = 'rgba(28,10,36,0.98)'; c.lineWidth = 4; seg(c, tb[0] + 2.5, y + h - 1, tb[1] - 2.5, y + h - 1); } // open the rim where the tail joins
+  c.fillStyle = '#fff4fa'; c.textAlign = 'center'; c.textBaseline = 'top';
+  lines.forEach((l, i) => c.fillText(l, cx, y + 12 + i * lh));
+  if (sp) { // name tab
+    c.font = `800 12px ${SANS}`;
+    const nw = c.measureText(sp.name).width + 20, nx = x + 14, ny = y - 11;
+    roundRect(c, nx, ny, nw, 20, 6); c.fillStyle = 'rgba(60,10,44,0.97)'; c.fill();
+    c.strokeStyle = col; c.lineWidth = 1.5; c.stroke();
+    c.fillStyle = col; c.textAlign = 'left'; c.textBaseline = 'middle'; c.fillText(sp.name, nx + 10, ny + 10.5);
+  }
+  c.restore();
 }
 function drawSceneBG(c, kind, t) {
   if (kind && kind.startsWith('img:')) {
@@ -120,12 +155,12 @@ const PROLOGUE = [
   { panels: [
     { rect: [30, 30, 430, 150], caption: '월광대 의정부지부 팀장 · 호랑이 수인 — 최호철', draw: panelImg('open.tiger', 0.3, 0.4) },
     { rect: [30, 195, 430, 150], caption: '월광대 반장 · 첨단 접선의 전략가 — 김선달', draw: panelImg('open.seondal', 0.4, 0.5) },
-    { rect: [30, 360, 430, 150], bubble: { x: 228, y: 40, w: 186, text: '요기? 그딴 거 없어도 칼 두 자루면 충분해.', tail: [210, 120] }, draw: panelImg('open.dongmin', 0.3, 0.5) },
+    { rect: [30, 360, 430, 150], caption: '월광대 전투부원 344기 · 요기 0%의 쌍검사 — 이동민', draw: panelImg('open.dongmin', 0.3, 0.5) },
     { rect: [480, 30, 450, 480], caption: '그리고 용왕의 핏줄, 심청이. 요괴를 소탕하는 자들 — 월광대(月光隊).', draw: panelImg('open.simcheong', 0.5, 0.3) },
   ] },
   { panels: [
-    { rect: [30, 30, 900, 300], caption: '그리고 지금 — 의정부에서 호랑이 수인들이 하나둘 살해당하고 있다.', draw: panelImg('skill.hocheol.passive', 0.5, 0.4) },
-    { rect: [30, 350, 900, 160], caption: '월광대가 왜 싸우는지, 그 답은 「신령의 시험」에서 시작된다. (CHAPTER 1 · 의정부 — 호랑이를 사냥하는 오누이)', draw: panelImg('boss.illust', 0.5, 0.35) },
+    { rect: [30, 30, 900, 276], caption: '그리고 지금 — 의정부에서 호랑이 수인들이 하나둘 살해당하고 있다.', draw: panelImg('skill.hocheol.passive', 0.5, 0.4) },
+    { rect: [30, 322, 900, 192], caption: '월광대가 왜 싸우는지, 그 답은 「신령의 시험」에서 시작된다. (CHAPTER 1 · 의정부 — 호랑이를 사냥하는 오누이)', draw: panelImg('open.chapter1', 0.5, 0.55, 'rgba(20,0,30,0.25)') },
   ] },
 ];
 
@@ -187,9 +222,9 @@ const STORY_14 = [
 // STAGE 1-5 보스 등장 카툰 컷신 (기획서 §3-3: 해님·달님의 등장과 호랑이 가죽 도발 대사)
 const BOSS_INTRO = [
   { panels: [
-    { rect: [30, 30, 900, 220], caption: '의정부, 자정. 두 자루의 검이 달빛 아래에서 울었다.', draw: panelImg('boss.illust', 0.5, 0.3) },
-    { rect: [30, 270, 440, 240], bubble: { x: 226, y: 22, w: 200, text: '이 호랑이 가죽, 제법 따뜻하더라. 다음은 네 차례야, 팀장님.', tail: [170, 150] }, draw: panelBust('skill.haenim', 'haenim', 0.02, 2.0) },
-    { rect: [490, 270, 440, 240], bubble: { x: 210, y: 22, w: 200, text: '간장이 태우고, 막야가 삼킨다. 호랑이는 하나도 남기지 않아.', tail: [150, 140] }, draw: panelBust('skill.dalnim', 'dalnim', 0.02, 2.0) },
+    { rect: [30, 30, 900, 220], caption: '의정부, 자정. 두 자루의 검이 달빛 아래에서 울었다.', draw: panelTwins },
+    { rect: [30, 270, 440, 240], bubble: { who: 'haenim', x: 214, y: 26, w: 210, text: '이 호랑이 가죽, 제법 따뜻하더라. 다음은 네 차례야, 팀장님.', tail: [160, 132] }, draw: panelBust('skill.haenim', 'haenim', 0.02, 2.0) },
+    { rect: [490, 270, 440, 240], bubble: { who: 'dalnim', x: 214, y: 26, w: 210, text: '간장이 태우고, 막야가 삼킨다. 호랑이는 하나도 남기지 않아.', tail: [150, 132] }, draw: panelBust('skill.dalnim', 'dalnim', 0.02, 2.0) },
   ] },
 ];
 
@@ -297,7 +332,7 @@ class CutsceneScene {
       c.save(); c.beginPath(); c.rect(0, 0, w, h); c.clip(); pn.draw(c, w, h, lt); c.restore();
       c.lineWidth = 4; c.strokeStyle = '#f6eef6'; c.strokeRect(0, 0, w, h);
       if (pn.caption) caption(c, 10, 10, Math.min(w - 20, 440), pn.caption);
-      if (pn.bubble) bubble(c, pn.bubble.x, pn.bubble.y, pn.bubble.w, pn.bubble.text, pn.bubble.tail);
+      if (pn.bubble) bubble(c, pn.bubble.x, pn.bubble.y, pn.bubble.w, pn.bubble.text, pn.bubble.tail, { who: pn.bubble.who, k: clamp((lt - 0.25) / 0.25, 0, 1) });
       c.restore();
     }
     neonButton(c, W - 130, 6, 124, 34, 'SKIP ▶▶', { size: 13 });
@@ -385,7 +420,8 @@ class ChaseScene { // STAGE 1-4 종료 후 → 붉은 살기 + 자동 추격 연
     c.save(); c.translate(-cam, 0); BG.street(c, cam, t); c.restore();
     this.party.forEach((k, i) => {
       const F = CHAR_DATA[k].frames;
-      drawFighter(c, k, 330 + i * 150, GROUND_Y, 1, { t, moving: true, walk: t * 20 + i, frame: F.dodge, lean: 0.1 });
+      const cyc = animFrame(k + '_run', t + i * 0.13) || animFrame(k + '_walk', t * 1.6 + i * 0.13);
+      drawFighter(c, k, 330 + i * 150, GROUND_Y, 1, cyc ? { t, frame: cyc } : { t, moving: true, walk: t * 20 + i, frame: F.dodge, lean: 0.1 });
     });
     c.strokeStyle = 'rgba(255,220,240,0.2)'; c.lineWidth = 2;
     const R = mulberry32(Math.floor(t * 20));
@@ -396,8 +432,9 @@ class ChaseScene { // STAGE 1-4 종료 후 → 붉은 살기 + 자동 추격 연
     c.fillStyle = g; c.fillRect(0, 0, W, H);
     BG.foliage(c, t);
     caption(c, 20, 20, 440, 'STAGE 1-4 CLEAR — 박쥐 수인의 분신을 모두 물리쳤다. 그 순간, 스산한 기운이…');
-    if (t > 0.7) bubble(c, 480, 200, 220, '...이 살기. 놈들이다!', [490, 320]);
-    if (t > 2.3) bubble(c, 140, 180, 230, '쫓아라! 놓치면 또 한 명 죽는다!', [320, 320]);
+    const [p0, p1] = this.party;
+    if (t > 0.7) bubble(c, 170, 214, 220, '…이 살기. 놈들이다!', [326, 330], { who: p0, k: clamp((t - 0.7) / 0.2, 0, 1) });
+    if (t > 2.3) bubble(c, 450, 186, 250, '쫓아라! 놓치면 또 한 명 죽는다!', [478, 326], { who: p1 || p0, k: clamp((t - 2.3) / 0.2, 0, 1) });
     if (t > 0.3) { // 느낌표 감각 아이콘 (기획서 대안 연출)
       c.save(); c.globalAlpha = Math.min(1, (t - 0.3) * 3); c.fillStyle = '#ff3a3a'; c.shadowColor = '#ff3a3a'; c.shadowBlur = 16;
       c.font = `900 46px ${SANS}`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('!', 480 + 150 * (this.party.length - 1) * 0.5, 300 - Math.abs(Math.sin(t * 6)) * 8); c.restore();

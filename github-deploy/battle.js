@@ -468,7 +468,11 @@ class Player extends Fighter {
       return this.st < 0.35 ? u[0] : u[1];
     }
     if (!this.onGround && s !== 'dead') return F.air;
-    if (s === 'move' && F.walk) return F.walk; // 걷기: 정면으로 선 자세 대신 옆으로 몸을 튼 보행 자세
+    if (s === 'move' && this.onGround) { // 걷기: 워크사이클이 있으면 프레임 애니메이션, 없으면 옆으로 몸을 튼 보행 자세
+      const a = animFrame(this.key + '_walk', this.b.real);
+      if (a) return a;
+      if (F.walk) return F.walk;
+    }
     if (s === 'idle' && this.key === 'hocheol' && this.combatT <= 0 && Math.floor((t || 0) / 3) % 3 === 2) return 'hocheol_pipe';
     return this.combatT > 0 && s !== 'dead' ? F.ready : F.idle;
   }
@@ -481,11 +485,16 @@ class Player extends Fighter {
     } else if (s === 'dodge') P.lean = 0.25;
     else if (s === 'hurt') { P.emo = 'shock'; P.lean = -0.35; }
     else if (s === 'grab') { P.squash = this.grabHits % 2 ? 0.05 : 0; P.lunge = this.grabHits % 2 ? 6 : 0; }
-    else if (s === 'move') P.lean = 0.08;
+    else if (s === 'move') { P.lean = /_walk_\d+$/.test(this.curFrame || '') ? 0 : 0.08; if (P.lean === 0) P.moving = false; }
     else if (s === 'dead') { P.emo = 'shock'; P.rot = -1.45; }
     // crossfade between painted frames
     const f = this.spriteFrame(t);
-    if (f !== this.curFrame) { this.prevFrame = this.curFrame; this.curFrame = f; this.frameAt = this.b.real; }
+    if (f !== this.curFrame) {
+      const cycle = /_(walk|run)_\d+$/;
+      // frames inside one walk cycle swap instantly (a crossfade would smear the legs)
+      if (cycle.test(f) && cycle.test(this.curFrame || '')) { this.prevFrame = null; this.frameAt = -9; } else { this.prevFrame = this.curFrame; this.frameAt = this.b.real; }
+      this.curFrame = f;
+    }
     P.frame = f; P.prevFrame = this.prevFrame; P.blend = (this.b.real - this.frameAt) / 0.09;
     return P;
   }
