@@ -15,10 +15,10 @@ const CHAR_DATA = {
     name: '최호철', title: '월광대 의정부지부 팀장', hp: 1100, atk: 58, speed: 255, yogi: true,
     combo: [
       { dur: 0.34, hitAt: 0.11, range: 80, height: 60, mult: 1.0, push: 140, lunge: 120, frame: 'hocheol_punch', fx: 'punch' },
-      { dur: 0.34, hitAt: 0.11, range: 80, height: 60, mult: 1.0, push: 140, lunge: 120, frame: 'hocheol_stance', fx: 'punch' },
-      { dur: 0.5, hitAt: 0.2, range: 106, height: 72, mult: 1.7, push: 320, lunge: 260, frame: 'hocheol_cast', fx: 'pipe' },
+      { dur: 0.34, hitAt: 0.11, range: 80, height: 60, mult: 1.0, push: 140, lunge: 120, frame: 'hocheol_p4', fx: 'punch' },
+      { dur: 0.5, hitAt: 0.2, range: 106, height: 72, mult: 1.7, push: 320, lunge: 260, frame: 'hocheol_p5', fx: 'pipe' },
     ],
-    frames: { idle: 'hocheol_side', walk: 'hocheol_stance', ready: 'hocheol_idle', air: 'hocheol_stance', dodge: 'hocheol_dash', skill: 'hocheol_cast', tagin: 'hocheol_punch', ult: ['hocheol_aura', 'hocheol_ult'], grab: 'hocheol_punch' },
+    frames: { idle: 'hocheol_p1', walk: 'hocheol_p3', ready: 'hocheol_p3', air: 'hocheol_p4', dodge: 'hocheol_dash', skill: 'hocheol_cast', tagin: 'hocheol_punch', ult: ['hocheol_aura', 'hocheol_ult'], grab: 'hocheol_punch' },
     skill: { name: '흑연호박', hanja: '黑煙虎縛', cd: 8, desc: '검은 연기 호랑이로 광역 피해 + 2초 속박' },
     ult: { name: '흑연호왕', hanja: '黑煙虎王', desc: '연기 흑호 돌진 후 폭발' },
     passive: { name: '맹호의 위압', hanja: '猛虎之威' },
@@ -28,10 +28,10 @@ const CHAR_DATA = {
     combo: [
       { dur: 0.22, hitAt: 0.07, range: 72, height: 58, mult: 0.9, push: 60, lunge: 140, frame: 'dongmin_slash1', fx: 'blade' },
       { dur: 0.22, hitAt: 0.07, range: 72, height: 58, mult: 0.9, push: 60, lunge: 140, frame: 'dongmin_slash2', fx: 'blade2' },
-      { dur: 0.24, hitAt: 0.08, range: 76, height: 58, mult: 1.0, push: 80, lunge: 160, frame: 'dongmin_slash1', fx: 'blade' },
+      { dur: 0.24, hitAt: 0.08, range: 76, height: 58, mult: 1.0, push: 80, lunge: 160, frame: 'dongmin_p5', fx: 'blade' },
       { dur: 0.4, hitAt: 0.14, range: 94, height: 72, mult: 1.8, push: 240, lunge: 240, frame: 'dongmin_lunge', fx: 'bladeBig' },
     ],
-    frames: { idle: 'dongmin_side', ready: 'dongmin_idle', air: 'dongmin_slash2', dodge: 'dongmin_dash', skill: 'dongmin_lunge', tagin: 'dongmin_lunge', ult: ['dongmin_dash', 'dongmin_ult', 'dongmin_slash2'], grab: 'dongmin_grab' },
+    frames: { idle: 'dongmin_p1', ready: 'dongmin_p4', air: 'dongmin_slash2', dodge: 'dongmin_p3', skill: 'dongmin_lunge', tagin: 'dongmin_lunge', ult: ['dongmin_dash', 'dongmin_ult', 'dongmin_slash2'], grab: 'dongmin_grab' },
     skill: { name: '해체자의 악력', hanja: '解體者握力', cd: 7, desc: '돌진 잡기 연타 + 방어력 15% 감소 + 2초 기절' },
     ult: { name: '광인의 해체식', hanja: '狂人의 解體式', desc: '돌진 베기 → 연속 베기 → 내려베기(3초 기절)' },
     passive: { name: '해체 본능', hanja: '解體本能' },
@@ -39,11 +39,11 @@ const CHAR_DATA = {
   seondal: {
     name: '김선달', title: '월광대 반장', hp: 980, atk: 46, speed: 290, yogi: false,
     combo: [
-      { dur: 0.28, hitAt: 0.09, range: 100, height: 66, mult: 0.95, push: 120, lunge: 110, frame: 'seondal_push', fx: 'fan' },
+      { dur: 0.28, hitAt: 0.09, range: 100, height: 66, mult: 0.95, push: 120, lunge: 110, frame: 'seondal_p4', fx: 'fan' },
       { dur: 0.3, hitAt: 0.1, range: 104, height: 66, mult: 0.95, push: 120, lunge: 110, frame: 'seondal_throw', fx: 'fan' },
-      { dur: 0.44, hitAt: 0.16, range: 140, height: 84, mult: 1.6, push: 280, lunge: 170, frame: 'seondal_push', fx: 'fanBig' },
+      { dur: 0.44, hitAt: 0.16, range: 140, height: 84, mult: 1.6, push: 280, lunge: 170, frame: 'seondal_p5', fx: 'fanBig' },
     ],
-    frames: { idle: 'seondal_side', ready: 'seondal_idle', air: 'seondal_throw', dodge: 'seondal_push', skill: 'seondal_push', tagin: 'seondal_throw', ult: ['seondal_idle', 'seondal_throw'], grab: 'seondal_push' },
+    frames: { idle: 'seondal_p1', ready: 'seondal_p4', air: 'seondal_throw', dodge: 'seondal_p3', skill: 'seondal_p5', tagin: 'seondal_throw', ult: ['seondal_p4', 'seondal_p5'], grab: 'seondal_push' },
     skill: { name: '만리추풍', hanja: '萬里追風', cd: 6, desc: '직선 바람 관통 피해 + 끝에서 폭발해 밀쳐냄' },
     ult: { name: '천풍만리', hanja: '天風萬里', desc: '회오리로 끌어당겨 지속 피해 후 광역 폭발' },
     passive: { name: '풍류의 잔상', hanja: '風流의 殘像' },
@@ -51,11 +51,11 @@ const CHAR_DATA = {
   simcheong: {
     name: '심청이', title: '용왕의 핏줄 · 수류 야차', hp: 1040, atk: 50, speed: 300, yogi: false,
     combo: [
-      { dur: 0.26, hitAt: 0.08, range: 92, height: 62, mult: 0.95, push: 80, lunge: 150, frame: 'simcheong_thrust', fx: 'sword' },
-      { dur: 0.28, hitAt: 0.09, range: 96, height: 70, mult: 1.0, push: 90, lunge: 150, frame: 'simcheong_slash', fx: 'swordUp' },
-      { dur: 0.42, hitAt: 0.15, range: 118, height: 78, mult: 1.7, push: 260, lunge: 240, frame: 'simcheong_lunge', fx: 'swordBig' },
+      { dur: 0.26, hitAt: 0.08, range: 92, height: 62, mult: 0.95, push: 80, lunge: 150, frame: 'simcheong_p3', fx: 'sword' },
+      { dur: 0.28, hitAt: 0.09, range: 96, height: 70, mult: 1.0, push: 90, lunge: 150, frame: 'simcheong_p4', fx: 'swordUp' },
+      { dur: 0.42, hitAt: 0.15, range: 118, height: 78, mult: 1.7, push: 260, lunge: 240, frame: 'simcheong_p5', fx: 'swordBig' },
     ],
-    frames: { idle: 'simcheong_side', ready: 'simcheong_idle', air: 'simcheong_raise', dodge: 'simcheong_lunge', skill: 'simcheong_water', tagin: 'simcheong_thrust', ult: ['simcheong_raise', 'simcheong_slash'], grab: 'simcheong_thrust' },
+    frames: { idle: 'simcheong_p1', ready: 'simcheong_p3', air: 'simcheong_p2', dodge: 'simcheong_lunge', skill: 'simcheong_water', tagin: 'simcheong_p3', ult: ['simcheong_p2', 'simcheong_p5'], grab: 'simcheong_thrust' },
     skill: { name: '심연수류', hanja: '深淵水流', cd: 7, desc: '전방 직선 물줄기 관통 + 3초간 이동·공격 30% 둔화' },
     ult: { name: '흑련개화: 야차강림', hanja: '黑蓮開花: 夜叉降臨', desc: '흑련 영역으로 끌어당겨 지속 피해 → 내려찍기(2.5초 기절)' },
     passive: { name: '인당수의 한', hanja: '印塘水之恨' },
@@ -473,7 +473,7 @@ class Player extends Fighter {
       if (a) return a;
       if (F.walk) return F.walk;
     }
-    if (s === 'idle' && this.key === 'hocheol' && this.combatT <= 0 && Math.floor((t || 0) / 3) % 3 === 2) return 'hocheol_pipe';
+    if (s === 'idle' && this.key === 'hocheol' && this.combatT <= 0 && Math.floor((t || 0) / 3) % 3 === 2) return 'hocheol_p2';
     return this.combatT > 0 && s !== 'dead' ? F.ready : F.idle;
   }
   pose(t) {
@@ -922,7 +922,7 @@ class Boss extends Fighter {
   pose(t) {
     const P = { t, flash: this.flash > 0, moving: Math.abs(this.vx) > 10 && this.onGround, walk: this.walk, air: !this.onGround, emo: 'normal' };
     const s = this.state;
-    if (!this.alive) { P.kneel = true; P.emo = 'shock'; P.armFront = 1.3; P.armBack = 1.4; P.lean = 0.35; P.frame = this.key + '_idle'; return P; }
+    if (!this.alive) { P.kneel = true; P.emo = 'shock'; P.armFront = 1.3; P.armBack = 1.4; P.lean = 0.35; P.frame = this.key + '_p1'; return P; }
     if (s === 'stun') { P.emo = 'shock'; P.stun = true; P.lean = -0.15; P.armFront = 1.4; }
     else if (s === 'atkWind' || s === 'skillWind') { P.emo = 'angry'; P.armFront = -1.9; P.stance = true; if (s === 'skillWind') P.glow = STYLES[this.key].aura; }
     else if (s === 'atk') {
@@ -938,7 +938,10 @@ class Boss extends Fighter {
     if (this.mode === 'frenzy' && P.emo === 'normal') P.emo = 'angry';
     if (this.grabbed > 0) { P.emo = 'shock'; P.lean = -0.25; }
     const act = ['atk', 'skill', 'leap', 'beamCharge', 'beamFire'].includes(s) && this.alive && this.grabbed <= 0;
-    P.frame = this.key + (act ? '_slash' : '_idle');
+    const wind = s === 'atkWind' || s === 'skillWind' || s === 'overWind' || s === 'beamCharge';
+    const cyc = P.moving && !act && !wind ? animFrame(this.key + '_walk', this.b.real) : null; // 워크사이클
+    if (cyc) { P.moving = false; P.lean = 0; }
+    P.frame = cyc || this.key + (act ? '_p5' : wind ? '_p4' : '_p1');
     return P;
   }
   draw(c, t) {
