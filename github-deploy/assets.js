@@ -124,6 +124,7 @@ const SPRITES = {
 // so the p1 standing pose is 360px tall. s = standing height in game px / 360.
 // p1 대기 · p2 걷기(최호철: 파이프 대기, 심청이: 술법) · p3 달리기(최호철: 전투 자세, 심청이: 겨누기) · p4 전투 준비 · p5 공격
 const DOC_POSES = { simcheong: 0.344, seondal: 0.358, hocheol: 0.403, dongmin: 0.375, haenim: 0.347, dalnim: 0.328 };
+DOC_POSES.simdragon = 0.367; // 심청이 용 변신 (동작 5종: 대기 · 걷기 · 도약 · 흑련 · 용 참격)
 for (const [k, s] of Object.entries(DOC_POSES)) for (let i = 1; i <= 5; i++) SPRITES[`${k}_p${i}`] = { s, f: 1 };
 
 // Full standing figures (assets/busts, Vision cut-outs) for dialogue and cut-ins.
@@ -141,6 +142,7 @@ const ANIMS = {
   dongmin_walk: { n: 9, fps: 13, s: 0.571 },
   haenim_walk: { n: 9, fps: 11, s: 0.429 },
   dalnim_walk: { n: 9, fps: 12, s: 0.405 },
+  simdragon_walk: { n: 9, fps: 11, s: 0.457 }, // 심청이 용 변신 워크플로우
 };
 for (const [k, a] of Object.entries(ANIMS)) for (let i = 0; i < a.n; i++) SPRITES[`${k}_${i}`] = { s: a.s, f: a.f != null ? a.f : 1 };
 function animFrame(name, t) { const a = ANIMS[name]; return a ? `${name}_${Math.floor(t * a.fps) % a.n}` : null; }

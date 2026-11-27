@@ -389,7 +389,7 @@ function drawSpriteImage(c, name, facing, pose, sx, sy, alpha) {
   c.scale(dir * sx, sy);
   const src = pose.flash ? Assets.whiteSprite(name) : im;
   if (!pose.flash && pose.rim !== false) { // soft rim light so dark outfits read against the night scene
-    const aura = (STYLES[name.split('_')[0]] || {}).aura || '#ffffff';
+    const base = name.split('_')[0], aura = base === 'simdragon' ? '#b57cff' : (STYLES[base] || {}).aura || '#ffffff';
     c.shadowColor = aura + 'a0'; c.shadowBlur = 8;
   }
   c.drawImage(src, -w * ax, -h, w, h);

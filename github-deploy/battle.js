@@ -62,6 +62,12 @@ const CHAR_DATA = {
     passive: { name: '인당수의 한', hanja: '印塘水之恨' },
   },
 };
+// 심청이 용 변신 (야차강림 각성형) — 궁극기를 쓰면 변신, 궁극기가 끝난 뒤에도 DRAGON_DUR초 유지. 평타 피해 +25%.
+const DRAGON_DUR = 15;
+const DRAGON_FRAMES = {
+  idle: 'simdragon_p1', ready: 'simdragon_p2', air: 'simdragon_p3', dodge: 'simdragon_p3', skill: 'simdragon_p4', tagin: 'simdragon_p5',
+  grab: 'simdragon_p5', ult: ['simdragon_p4', 'simdragon_p5'], combo: ['simdragon_p3', 'simdragon_p5', 'simdragon_p4'],
+};
 const HAN_HP = 0.3; // 인당수의 한 발동 체력 (design doc: 30%)
 const PLAYABLE = ['dongmin', 'hocheol', 'seondal', 'simcheong'];
 
@@ -226,7 +232,7 @@ class Player extends Fighter {
   update(dt) {
     const b = this.b, I = b.locked ? NO_INPUT : Input;
     this.st += dt;
-    for (const k of ['inv', 'skillCd', 'sealed', 'bound', 'dodgeCd', 'flash', 'dropT', 'combatT', 'buffAtk', 'buffDef']) if (this[k] > 0) this[k] = Math.max(0, this[k] - dt);
+    for (const k of ['inv', 'skillCd', 'sealed', 'bound', 'dodgeCd', 'flash', 'dropT', 'combatT', 'buffAtk', 'buffDef', 'dragonT']) if (this[k] > 0) this[k] = Math.max(0, this[k] - dt);
     if (this.dead) { this.vx *= Math.pow(0.05, dt); this.physics(dt); return; }
     if (this.key === 'hocheol') { // 맹호의 위압: 적이 무리 지어 다가오면(보스 둘 다 근접) 공격력 +10% · 받는 피해 -10%
       const near = b.liveBosses().filter(e => Math.abs(e.x - this.x) < 300).length;
@@ -398,7 +404,15 @@ class Player extends Fighter {
     if (this.ult < 100) return;
     this.ult = 0; this.setState('ult'); this.ultStage = 0; this.ultFrenzy = false; this.ultHit = new Set(); this.ultTick = 0; this.inv = 99; this.combatT = 3;
     this.b.ultCinematic(this);
+    if (this.key === 'simcheong') this.transformDragon();
     Sfx.play('ult');
+  }
+  transformDragon() { // 야차강림 — 심해의 용으로 각성
+    const b = this.b, fresh = !this.dragon;
+    this.dragonT = 1.75 + DRAGON_DUR; // 궁극기 연출 + 유지 시간
+    b.fx.vfx('simcheong_lotus', this.x, this.y - 50, 300, { life: 0.8, s0: 0.4, s1: 1.3, add: true });
+    b.fx.ring(this.x, this.y - 60, 140, '#b57cff', 0.5, true);
+    if (fresh) b.fx.text(this.x, this.y - this.h - 60, '용 변신 — 야차강림!', '#d9a8ff', 22, 1.5);
   }
   updateUlt(dt) {
     const b = this.b, s = this.st;
@@ -453,9 +467,10 @@ class Player extends Fighter {
     } else if (s >= 1.9) { this.state = 'idle'; this.inv = 0.3; }
   }
   // which doc-art pose to show for the current state
+  get dragon() { return this.key === 'simcheong' && this.dragonT > 0 && !this.dead; }
   spriteFrame(t) {
-    const s = this.state, F = this.d.frames;
-    if (s === 'attack') return this.d.combo[this.comboIdx].frame;
+    const s = this.state, dr = this.dragon, F = dr ? DRAGON_FRAMES : this.d.frames;
+    if (s === 'attack') return dr ? F.combo[this.comboIdx] : this.d.combo[this.comboIdx].frame;
     if (s === 'dodge') return F.dodge;
     if (s === 'grabdash' || s === 'tagin') return F.tagin;
     if (s === 'grab') return F.grab;
@@ -469,7 +484,7 @@ class Player extends Fighter {
     }
     if (!this.onGround && s !== 'dead') return F.air;
     if (s === 'move' && this.onGround) { // 걷기: 워크사이클이 있으면 프레임 애니메이션, 없으면 옆으로 몸을 튼 보행 자세
-      const a = animFrame(this.key + '_walk', this.b.real);
+      const a = animFrame((dr ? 'simdragon' : this.key) + '_walk', this.b.real);
       if (a) return a;
       if (F.walk) return F.walk;
     }
@@ -1272,6 +1287,7 @@ class Battle {
       if (e.dmHits % 5 === 0) { dmg *= 1.3; crit = true; this.fx.vfx('dongmin_mark', e.x, e.y - e.h * 0.55, 120, { life: 0.5, s0: 1.7, s1: 0.95, spin: 3 }); }
     }
     if (src.key === 'seondal' && o.basic) src.fanStacks = Math.min(5, src.fanStacks + 1); // 풍류의 잔상 축적
+    if (src.key === 'simcheong' && src.dragon && o.basic) dmg *= 1.25; // 용 변신: 평타 피해 +25%
     if (src.key === 'simcheong') { // 인당수의 한: 체력 30% 이하 치명 피해 +20%, 젖은(심연수류) 적 타격 시 피해의 3% 회복
       if (src.hp / src.maxHp <= HAN_HP) { dmg *= 1.2; crit = true; }
       if (e.soakT > 0 && src.hp < src.maxHp) {
@@ -1718,6 +1734,7 @@ class Battle {
     if (p.bound > 0) chip(`속박 ${p.bound.toFixed(1)}s`, '#7a4dff');
     if (p.key === 'hocheol' && o.key === 'dongmin' && !o.dead) chip(this.assistCd > 0 ? `파마해체 대기 ${Math.ceil(this.assistCd)}s` : '파마해체 준비', this.assistCd > 0 ? '#3a3a48' : '#a8242c');
     if (p.key === 'seondal') chip(`풍류의 잔상 ${p.fanStacks}/5`, p.fanStacks >= 5 ? '#2a7ab8' : '#2a3048');
+    if (p.dragon) chip(`용 변신 ${Math.ceil(p.dragonT)}s — 평타 +25%`, '#6a2cc0');
     if (p.key === 'simcheong' && p.hp / p.maxHp <= HAN_HP) chip('인당수의 한 — 치명 +20% · 궁극기 충전 2배', '#8a1a4a');
     else if (p.key === 'simcheong' && !p.hanAwoken) chip('인당수의 한 — 체력 30% 이하 시 궁극기 개방', '#3a2040');
     if (p.buffAtk > 0 || p.buffDef > 0) chip('시너지 버프', '#8a5a1a');

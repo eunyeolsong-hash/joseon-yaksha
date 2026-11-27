@@ -612,5 +612,75 @@ const SPRITE_META = {
   "h": 273,
   "mid": 0.542,
   "w": 288
+ },
+ "simdragon_p1": {
+  "h": 360,
+  "mid": 0.513,
+  "w": 147
+ },
+ "simdragon_p2": {
+  "h": 357,
+  "mid": 0.494,
+  "w": 130
+ },
+ "simdragon_p3": {
+  "h": 331,
+  "mid": 0.459,
+  "w": 156
+ },
+ "simdragon_p4": {
+  "h": 391,
+  "mid": 0.6,
+  "w": 192
+ },
+ "simdragon_p5": {
+  "h": 360,
+  "mid": 0.471,
+  "w": 237
+ },
+ "simdragon_walk_0": {
+  "h": 280,
+  "mid": 0.475,
+  "w": 142
+ },
+ "simdragon_walk_1": {
+  "h": 274,
+  "mid": 0.483,
+  "w": 119
+ },
+ "simdragon_walk_2": {
+  "h": 257,
+  "mid": 0.532,
+  "w": 134
+ },
+ "simdragon_walk_3": {
+  "h": 261,
+  "mid": 0.568,
+  "w": 144
+ },
+ "simdragon_walk_4": {
+  "h": 265,
+  "mid": 0.467,
+  "w": 161
+ },
+ "simdragon_walk_5": {
+  "h": 268,
+  "mid": 0.515,
+  "w": 127
+ },
+ "simdragon_walk_6": {
+  "h": 277,
+  "mid": 0.496,
+  "w": 119
+ },
+ "simdragon_walk_7": {
+  "h": 278,
+  "mid": 0.478,
+  "w": 136
+ },
+ "simdragon_walk_8": {
+  "h": 274,
+  "mid": 0.468,
+  "w": 145
  }
 };
