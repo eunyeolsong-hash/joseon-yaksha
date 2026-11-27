@@ -234,8 +234,6 @@ class Player extends Fighter {
       if (on && !this.tigerAura) { b.fx.text(this.x, this.y - this.h - 34, '맹호의 위압!', '#c9a6ff', 18); b.skillCard(this.key, 'passive', this.d.passive.name); b.fx.vfx('hocheol_eyes', this.x, this.y - this.h * 0.62, 260, { life: 0.6, s0: 0.7, s1: 1.3 }); }
       this.tigerAura = on;
     }
-    // design doc: HP slowly drains over time (신상패딩 slows this)
-    if (b.state === 'fight') this.hp = Math.max(1, this.hp - this.maxHp * 0.0012 * dt);
     const dir = (I.held('right') ? 1 : 0) - (I.held('left') ? 1 : 0);
     if (this.state === 'idle' || this.state === 'move') {
       if (this.bound > 0) { this.vx = 0; this.state = 'idle'; }
@@ -1206,9 +1204,24 @@ class Battle {
     this.cards = this.cards.filter(cd => cd.side !== (kind === 'boss' ? 'right' : 'left'));
     this.cards.push({ img, name, key, side: kind === 'boss' ? 'right' : 'left', t: 0, dur: kind === 'passive' ? 1.3 : 1.6, kind });
   }
+  addSyn(v) { // 2인 시너지 게이지 — 가득 차는 순간 한 번 알려 준다
+    const was = this.syn;
+    this.syn = Math.min(100, this.syn + v);
+    if (was < 100 && this.syn >= 100 && !this.party.some(q => q.dead)) {
+      this.banner('합동기 준비!', `「${this.synCfg.name}」 — ` + (Input.touch ? '합동기 버튼' : '[O] 키') + '로 발동', this.synCfg.color, 2.0);
+      Sfx.play('ui');
+    }
+  }
   trySynergy() {
     const p = this.player, o = this.party[1 - this.active], cfg = this.synCfg;
-    if (this.syn < 100 || this.synergy || p.dead || o.dead || this.state !== 'fight') return;
+    if (this.synergy || this.state !== 'fight') return;
+    if (this.syn < 100 || p.dead || o.dead) { // 아직 못 쓸 때도 눌렀다는 반응은 준다
+      if (this.real - (this.lastSynNag || -9) > 0.6) {
+        this.lastSynNag = this.real; Sfx.play('block');
+        this.fx.text(p.x, p.y - p.h - 34, o.dead ? '합동기 불가 — 파트너 전투불능' : `합동기 게이지 ${Math.floor(this.syn)}% — 공격·교대로 채우자`, '#ff9ac0', 15, 1.1);
+      }
+      return;
+    }
     if (!['idle', 'move', 'attack', 'hurt'].includes(p.state)) return;
     this.syn = 0; this.stats.syn = (this.stats.syn || 0) + 1;
     this.cine = { kind: 'synergy', keys: [p.key, o.key], name: cfg.name, hanja: cfg.hanja, color: cfg.color, t: 0 }; this.hitstop = 0.12;
@@ -1243,7 +1256,7 @@ class Battle {
         this.fx.text(cx, cy - 34, '요기 반감', '#c9a6ff', 16);
         this.fx.spark(cx, cy, '#a77bff', 6, 200);
       }
-      if (!o.noCount) { this.blockCount++; this.syn = Math.min(100, this.syn + 1.5); }
+      if (!o.noCount) { this.blockCount++; this.addSyn(1.5); }
       if (!this.flags.nullified) {
         this.flags.nullified = true;
         this.banner('요기 반감!', '간장·막야가 연기 술법을 절반 삼킨다 — 주먹으로 밀어붙이거나 이동민과 연계하라', '#b98cff', 3.4);
@@ -1291,7 +1304,7 @@ class Battle {
     if (!o.quiet) { this.hitstop = Math.max(this.hitstop, crit ? 0.07 : 0.035); this.shake(crit ? 6 : 3); Sfx.play(crit ? 'crit' : 'hit'); }
     const hanX = src.key === 'simcheong' && src.hp / src.maxHp <= HAN_HP ? 2 : 1; // 인당수의 한: 위기 중 궁극기 충전 2배
     src.ult = Math.min(100, src.ult + dmg / 14 * hanX);
-    if (!this.synergy) this.syn = Math.min(100, this.syn + dmg / 22);
+    if (!this.synergy) this.addSyn(dmg / 15);
     return dmg;
   }
   hitPlayer(dmg, o = {}) {
@@ -1341,6 +1354,7 @@ class Battle {
     nxt.facing = cur.facing; nxt.onGround = cur.onGround; nxt.setState('tagin'); nxt.inv = 0.5; nxt.bound = 0;
     if (!cur.dead) { cur.state = 'idle'; cur.vx = 0; cur.bound = 0; }
     this.active = 1 - this.active; this.tagCd = 1.5; this.stats.tags++;
+    if (this.state === 'fight' && !this.synergy) this.addSyn(6); // 교대 연계도 합동기 게이지를 채운다
     this.fx.smoke(nxt.x, nxt.y - 64, 8, 'rgba(240,240,255,0.5)', 26);
     this.fx.ring(nxt.x, nxt.y - 64, 60, STYLES[nxt.key].aura, 0.3);
     this.fx.text(nxt.x, nxt.y - nxt.h - 30, nxt.d.name + ' 교대!', STYLES[nxt.key].aura, 18);
@@ -1688,6 +1702,11 @@ class Battle {
     this.bar(c, tx + 32, ty + 6, 70, 6, o.hp / o.maxHp, '#e0232e', '#3a0a12');
     c.font = `800 11px ${SANS}`; c.textAlign = 'left';
     outlinedText(c, (Input.touch ? 'TAG ' : 'TAG [Q] ') + o.d.name, tx + 32, ty - 4, '#ffd27a', '#000', 3);
+    // 2인 시너지 합동기 게이지
+    const synFull = this.syn >= 100 && !this.party.some(q => q.dead), sx = 196, sy = ty + 4;
+    this.bar(c, sx, sy, 150, 7, this.syn / 100, synFull ? `hsl(${330 + Math.sin(this.real * 8) * 12},100%,66%)` : this.synCfg.color, '#1e1424');
+    c.font = `800 11px ${SANS}`; c.textAlign = 'left';
+    outlinedText(c, synFull ? `합동기 준비! ${Input.touch ? '' : '[O] '}${this.synCfg.name}` : `합동기 ${this.synCfg.name} ${Math.floor(this.syn)}%`, sx, sy - 6, synFull ? '#ffd0f0' : '#e8c8e0', '#000', 3);
     // statuses
     let chipX = 12;
     const chip = (txt, col) => {
