@@ -89,7 +89,7 @@ const Save = {
 const Sfx = (() => {
   // Soft synthesized SFX: sine thumps + filtered-noise whooshes through a compressor.
   // (The old square/sawtooth tones and the long beam-charge drone sounded harsh.)
-  let ac = null, master = null, noiseBuf = null;
+  let ac = null, master = null, noiseBuf = null, musicOut = null;
   let muted = Save.get('muted', false);
   const last = {};
   function unlock() {
@@ -100,12 +100,14 @@ const Sfx = (() => {
         comp.threshold.value = -18; comp.knee.value = 12; comp.ratio.value = 6; comp.attack.value = 0.003; comp.release.value = 0.15;
         master = ac.createGain(); master.gain.value = muted ? 0 : 0.5;
         master.connect(comp); comp.connect(ac.destination);
+        musicOut = ac.createGain(); musicOut.gain.value = 0.75; musicOut.connect(master); // BGM bus (music.js) — muted with everything else
         noiseBuf = ac.createBuffer(1, ac.sampleRate, ac.sampleRate);
         const d = noiseBuf.getChannelData(0);
         for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
       } catch (e) { ac = null; }
     }
-    if (ac && ac.state === 'suspended') ac.resume();
+    if (ac && ac.state === 'suspended') ac.resume().then(() => { if (typeof Music !== 'undefined') Music.poke(); });
+    if (typeof Music !== 'undefined') Music.poke();
   }
   function env(g, t0, vol, atk, dur) { // click-free attack/decay envelope
     g.gain.setValueAtTime(0.0001, t0);
@@ -155,6 +157,8 @@ const Sfx = (() => {
   };
   return {
     unlock,
+    get ctx() { return ac; },
+    get musicOut() { return musicOut; },
     play(n) {
       if (!ac || muted) return;
       const now = ac.currentTime;

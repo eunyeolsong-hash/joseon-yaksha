@@ -657,7 +657,13 @@ class LoseScene {
 const Game = {
   scene: null, fade: 0, fadeDir: 0, pending: null,
   go(s) { if (this.fadeDir === 1) return; this.pending = s; this.fadeDir = 1; },
-  setNow(s) { if (this.scene && this.scene.exit) this.scene.exit(); this.scene = s; Input.setButtons([]); if (s.enter) s.enter(); },
+  setNow(s) { if (this.scene && this.scene.exit) this.scene.exit(); this.scene = s; Input.setButtons([]); if (s.enter) s.enter(); this.music(s); },
+  music(s) { // BGM per scene: 타이틀 → 스산한 밤, 전투 → 자진모리, 결과 화면은 승리/패배 징 소리, 나머지는 잔잔한 대화 테마
+    if (s instanceof TitleScene) Music.play('title');
+    else if (s instanceof BattleScene || s instanceof ChaseScene) { Music.resetIntensity(); Music.play('battle'); }
+    else if (s instanceof ResultScene || s instanceof LoseScene) { /* sting already played by the battle */ }
+    else Music.play('story');
+  },
   update(dt) {
     if (this.fadeDir === 1) {
       this.fade += dt * 4;

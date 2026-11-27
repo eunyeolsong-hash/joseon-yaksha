@@ -1401,10 +1401,11 @@ class Battle {
   }
   lose(key) {
     if (this.state === 'defeat' || this.state === 'victory') return;
-    this.state = 'defeat'; this.loser = key; this.endT = 0; this.locked = true; Sfx.play('lose');
+    this.state = 'defeat'; this.loser = key; this.endT = 0; this.locked = true; Sfx.play('lose'); Music.play('defeat');
   }
   victory() {
     this.state = 'victory'; this.endT = 0; this.locked = true; this.timeScale = 0.3;
+    Music.play('victory');
     this.banner('해님·달님 제압!', '의정부의 밤을 지켜냈다', '#ffd34d', 3, true);
     this.beam = null;
     Sfx.play('win');
@@ -1456,7 +1457,7 @@ class Battle {
     if (this.phase === 1) {
       h.minHp = h.maxHp * 0.55; d.minHp = d.maxHp * 0.55;
       if (h.hp <= h.maxHp * 0.7 || d.hp <= d.maxHp * 0.7) {
-        this.phase = 2; h.minHp = h.maxHp * 0.35; d.minHp = 0; d.overCd = 2.5;
+        this.phase = 2; Music.setIntensity(2); h.minHp = h.maxHp * 0.35; d.minHp = 0; d.overCd = 2.5;
         this.banner('PHASE 2', PHASE_NAMES[2] + ' — 달님의 폭주 뒤 빈틈을 노려라', '#b98cff', 2.6, true);
       }
     } else if (this.phase === 2) {
@@ -1469,7 +1470,7 @@ class Battle {
       if (this.phase3T > 0) {
         this.phase3T -= dt;
         if (this.phase3T <= 0) {
-          this.phase = 3; h.minHp = 0; h.setMode('frenzy');
+          this.phase = 3; Music.setIntensity(3); h.minHp = 0; h.setMode('frenzy');
           this.banner('PHASE 3', PHASE_NAMES[3] + ' — 폭주가 끝난 빈틈에 마지막 일격을!', '#ff6a3a', 2.6, true);
         }
       }
