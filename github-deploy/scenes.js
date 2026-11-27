@@ -236,7 +236,7 @@ const PRE_BATTLE = [
   { who: 'dalnim', side: 'right', emo: 'smirk', text: '호랑이는 다 똑같아. 간장이 사악한 기운을 태우고, 막야가 요기를 삼키면 끝이야.' },
   { who: 'dongmin', side: 'left', emo: 'normal', text: '팀장님, 저 칼들… 요기를 먹어 치웁니다. 연기 술법은 안 통할 거예요.' },
   { who: 'hocheol', side: 'left', emo: 'smirk', text: '알고 있다. 그래도 여긴 내 구역이다. 이동민 — 요기 한 방울 없는 네 손이 열쇠다.' },
-  { narr: true, text: 'TIP · 최호철의 연기는 간장·막야에 무력화되고, 심청이의 수류 술법은 막야가 절반을 삼킨다. 요기 0%의 이동민과 접선의 김선달은 정상 타격. 1페이즈 오누이 협공 → 2페이즈 달님 주화입마의 빈틈 → 3페이즈 해님의 동요.' },
+  { narr: true, text: 'TIP · 최호철의 연기 술법과 심청이의 수류 술법은 간장·막야가 절반을 삼킨다. 최호철의 주먹, 요기 0%의 이동민, 원거리 부채 바람의 김선달은 정상 타격. 1페이즈 오누이 협공 → 2페이즈 달님 주화입마의 빈틈 → 3페이즈 해님의 동요.' },
 ];
 
 const POST_BATTLE = [
@@ -551,7 +551,7 @@ class PartyScene {
       c.font = `600 10px ${SANS}`; c.fillStyle = '#cfe8ff';
       c.fillText('스킬 ' + d.skill.name + ' · 궁극기 ' + d.ult.name.split(':')[0], r.x + 12, r.y + r.h - 40);
       c.fillStyle = k === 'hocheol' ? '#c9a6ff' : k === 'simcheong' ? '#9fd8ff' : '#9fffb0';
-      c.fillText(k === 'hocheol' ? '요기 술법 — 간장·막야에 무력화' : k === 'simcheong' ? '수류 술법 — 막야가 절반 흡수' : k === 'dongmin' ? '요기 0% — 정상 타격 (추천)' : '첨단 접선 — 정상 타격', r.x + 12, r.y + r.h - 22);
+      c.fillText(k === 'hocheol' ? '연기 술법 절반 흡수 · 주먹은 정상 타격' : k === 'simcheong' ? '수류 술법 — 막야가 절반 흡수' : k === 'dongmin' ? '요기 0% — 정상 타격 (추천)' : '원거리 부채 바람 — 정상 타격', r.x + 12, r.y + r.h - 22);
       if (on) {
         c.fillStyle = '#c8203e'; circle(c, r.x + r.w - 22, r.y + 22, 16); c.fill(); c.strokeStyle = '#fff'; c.lineWidth = 2; c.stroke();
         c.fillStyle = '#fff'; c.font = `900 15px ${SANS}`; c.textAlign = 'center'; c.fillText(si === 0 ? '선봉' : '2', r.x + r.w - 22, r.y + 23);
@@ -646,7 +646,7 @@ class LoseScene {
     c.font = `900 96px ${SERIF}`; outlinedText(c, 'LOSE', W / 2, 150, '#d02040', '#000', 8);
     if (this.key === 'hocheol') { c.font = `700 22px ${SERIF}`; outlinedText(c, '"크윽... 어째서 연기에 불이... 내 공격이 통하지 않는다고?"', W / 2, 250, '#ffd9e0', '#000', 4); }
     c.font = `500 15px ${SANS}`; c.fillStyle = '#e0c8d4';
-    c.fillText('TIP · 간장은 사악한 기운을 태우고 막야는 요기를 삼킨다. 이동민(요기 0%)·김선달(접선)은 정상 타격.', W / 2, 320);
+    c.fillText('TIP · 간장·막야는 요기 술법을 절반 삼킨다. 주먹·칼·부채 바람은 정상 타격.', W / 2, 320);
     c.fillText('2페이즈에서는 달님의 폭주 뒤 빈틈(주화입마)을, 쌍검 광선은 지붕 위나 회피로 피하자. 합동기도 잊지 말 것!', W / 2, 346);
     neonButton(c, W / 2 - 270, 430, 250, 54, '재도전', { primary: true, size: 20 });
     neonButton(c, W / 2 + 20, 430, 250, 54, '편성 바꾸기', { size: 18 });

@@ -2,7 +2,7 @@
 // ============================================================
 // battle.js — STAGE 1-5 「해님달님 — 원한의 끝」
 //   2-character tag party (any two of 이동민·최호철·김선달·심청이), 요기 matchup rule
-//   (간장·막야 nullify 최호철's 요기 attacks, absorb half of 심청이's 수류 술법; 이동민 has 0% 요기),
+//   (간장·막야 absorb half of the 요기 술법 — 최호철's smoke skills and 심청이's 수류 술법; fists, blades and fans hit normally),
 //   2인 시너지 합동기 (auto-assist 파마해체 for 최호철+이동민), twin-sword beam, 3 boss phases.
 // ============================================================
 const NO_INPUT = { held: () => false, pressed: () => false };
@@ -39,9 +39,10 @@ const CHAR_DATA = {
   seondal: {
     name: '김선달', title: '월광대 반장', hp: 980, atk: 46, speed: 290, yogi: false,
     combo: [
-      { dur: 0.28, hitAt: 0.09, range: 100, height: 66, mult: 0.95, push: 120, lunge: 110, frame: 'seondal_p4', fx: 'fan' },
-      { dur: 0.3, hitAt: 0.1, range: 104, height: 66, mult: 0.95, push: 120, lunge: 110, frame: 'seondal_throw', fx: 'fan' },
-      { dur: 0.44, hitAt: 0.16, range: 140, height: 84, mult: 1.6, push: 280, lunge: 170, frame: 'seondal_p5', fx: 'fanBig' },
+      // 원거리 딜러: 부채 바람을 날린다 (range = 사거리, FanShot 참고). 뒤로 살짝 물러나며 쏜다.
+      { dur: 0.3, hitAt: 0.1, range: 520, height: 60, mult: 0.85, push: 70, lunge: -40, frame: 'seondal_p4', fx: 'fan', shot: true },
+      { dur: 0.32, hitAt: 0.11, range: 520, height: 60, mult: 0.85, push: 70, lunge: -40, frame: 'seondal_throw', fx: 'fan', shot: true },
+      { dur: 0.48, hitAt: 0.17, range: 620, height: 90, mult: 1.45, push: 240, lunge: -70, frame: 'seondal_p5', fx: 'fanBig', shot: true },
     ],
     frames: { idle: 'seondal_p1', ready: 'seondal_p4', air: 'seondal_throw', dodge: 'seondal_p3', skill: 'seondal_p5', tagin: 'seondal_throw', ult: ['seondal_p4', 'seondal_p5'], grab: 'seondal_push' },
     skill: { name: '만리추풍', hanja: '萬里追風', cd: 6, desc: '직선 바람 관통 피해 + 끝에서 폭발해 밀쳐냄' },
@@ -61,6 +62,7 @@ const CHAR_DATA = {
     passive: { name: '인당수의 한', hanja: '印塘水之恨' },
   },
 };
+const HAN_HP = 0.3; // 인당수의 한 발동 체력 (design doc: 30%)
 const PLAYABLE = ['dongmin', 'hocheol', 'seondal', 'simcheong'];
 
 // 2인 시너지 (design doc §2-3). Key = the two character keys sorted and joined with '+'.
@@ -294,7 +296,7 @@ class Player extends Fighter {
         if (!this.hitDone && this.st >= 0.08) {
           this.hitDone = true;
           b.fx.slash(this.x + this.facing * 40, this.y - this.h * 0.55, this.facing, 56, false, STYLES[this.key].aura);
-          b.playerHit(this, this.frontRect(96, 80, -10), { mult: 1.2, push: 200 });
+          b.playerHit(this, this.frontRect(96, 80, -10), { mult: 1.2, push: 200, phys: true });
         }
         if (this.st >= 0.3) { this.state = 'idle'; this.vx = 0; }
         break;
@@ -319,10 +321,9 @@ class Player extends Fighter {
       case 'bladeBig': fx.slash(x, cy, this.facing, 64, false, '#ff5a5a'); break;
       case 'punch': fx.ring(this.x + this.facing * 58, cy, 28, '#ffa040', 0.2); fx.smoke(this.x + this.facing * 60, cy, 2, 'rgba(25,22,32,0.7)', 16); break;
       case 'pipe': fx.ring(this.x + this.facing * 58, cy, 46, '#ffa040', 0.2); fx.smoke(this.x + this.facing * 60, cy, 6, 'rgba(25,22,32,0.7)', 16); break;
-      case 'fan': case 'fanBig':
-        fx.slash(x + this.facing * 10, cy, this.facing, a.fx === 'fanBig' ? 72 : 52, Math.random() < 0.5, pierce ? '#ffffff' : '#9fe0ff');
-        if (a.fx === 'fanBig' || pierce) fx.vfx('seondal_crescent', x + this.facing * 34, cy, pierce ? 190 : 150, { flip: this.facing < 0, life: 0.3, s0: 0.85, s1: 1.2 });
-        for (let i = 0; i < (a.fx === 'fanBig' || pierce ? 10 : 5); i++) fx.part(this.x + this.facing * rand(30, range), cy + rand(-24, 24), { vx: this.facing * rand(200, 420), vy: rand(-30, 30), life: 0.3, size: 2.5, color: '#bfeaff', shape: 'line', drag: 0.2 });
+      case 'fan': case 'fanBig': // 부채를 휘두른 자리에 짧은 바람 + 투사체 발사
+        fx.slash(x - this.facing * 6, cy, this.facing, a.fx === 'fanBig' ? 44 : 32, Math.random() < 0.5, pierce ? '#ffffff' : '#9fe0ff');
+        for (let i = 0; i < 4; i++) fx.part(x, cy + rand(-14, 14), { vx: this.facing * rand(160, 320), vy: rand(-40, 40), life: 0.22, size: 2.2, color: '#bfeaff', shape: 'line', drag: 0.3 });
         Sfx.play('wind'); break;
       case 'sword': case 'swordUp': fx.slash(x, cy, this.facing, 54, a.fx === 'swordUp', '#ffc0e0'); break;
       case 'swordBig':
@@ -330,6 +331,7 @@ class Player extends Fighter {
         for (let i = 0; i < 8; i++) fx.part(this.x + this.facing * rand(20, 110), cy + rand(-20, 20), { vx: this.facing * rand(80, 220), vy: rand(-120, -20), life: 0.4, size: rand(2, 4), color: '#8ad8ff', grav: 600 });
         break;
     }
+    if (a.shot) { b.zones.push(new FanShot(b, this, { mult, push: a.push, range, h: a.height, big: a.fx === 'fanBig', pierce })); return; }
     b.playerHit(this, this.frontRect(range, a.height, -10), { mult, push: a.push, basic: true, pierce });
   }
   trySkill() {
@@ -503,7 +505,7 @@ class Player extends Fighter {
     if (!this.dead) { // painted passive auras (VFX sheet ①)
       if (this.key === 'seondal' && this.fanStacks >= 5) drawVfx(c, 'seondal_aura', this.x, this.y - this.h * 0.5, 150, { rot: t * 2.5, alpha: 0.6 + Math.sin(t * 6) * 0.15 });
       if (this.key === 'hocheol' && this.tigerAura) drawVfx(c, 'hocheol_eyes', this.x, this.y - this.h * 0.62, 230, { alpha: 0.55 + Math.sin(t * 4) * 0.12 });
-      if (this.key === 'simcheong' && this.hp / this.maxHp <= 0.4) drawVfx(c, 'simcheong_regen', this.x, this.y + 6, 130, { ay: 0.96, alpha: 0.5 + Math.sin(t * 5) * 0.15 });
+      if (this.key === 'simcheong' && this.hp / this.maxHp <= HAN_HP) drawVfx(c, 'simcheong_regen', this.x, this.y + 6, 130, { ay: 0.96, alpha: 0.5 + Math.sin(t * 5) * 0.15 });
     }
     if (this.buffAtk > 0 || this.buffDef > 0) {
       c.strokeStyle = `rgba(255,200,120,${0.4 + Math.sin(t * 8) * 0.2})`; c.lineWidth = 2;
@@ -597,6 +599,40 @@ function drawSmokeTiger(c, x, y, dir, s, alpha, t) {
 }
 
 // ---------------- 김선달 · 심청이 skills ----------------
+class FanShot { // 김선달 평타: 부채 바람 투사체 (풍압 화살 / 초승달 풍압). pierce = 풍류의 잔상 강화탄 — 관통
+  constructor(b, o, a) {
+    this.b = b; this.o = o; this.a = a; this.dir = o.facing; this.t = 0; this.done = false; this.hit = new Set();
+    this.x = o.x + this.dir * 46; this.x0 = this.x; this.y = o.y - o.h * 0.58;
+    this.speed = a.pierce ? 1100 : a.big ? 980 : 1050; this.w = a.pierce ? 150 : a.big ? 110 : 80;
+  }
+  update(dt) {
+    const b = this.b; this.t += dt;
+    this.x += this.dir * this.speed * dt;
+    const r = { x: this.x - this.w * 0.5, y: this.y - this.a.h * 0.5, w: this.w, h: this.a.h };
+    for (const e of b.liveBosses()) {
+      if (this.hit.has(e) || !rectsOverlap(r, e.rect())) continue;
+      this.hit.add(e);
+      b.damageBoss(this.o, e, { mult: this.a.mult, push: this.a.push, basic: true });
+      b.fx.vfx('seondal_burst', this.x + this.dir * 10, this.y, this.a.big || this.a.pierce ? 170 : 110, { life: 0.3, s0: 0.5, s1: 1.1 });
+      if (!this.a.pierce) { this.done = true; return; }
+    }
+    if (Math.random() < dt * 40) b.fx.part(this.x - this.dir * rand(10, 50), this.y + rand(-18, 18), { vx: -this.dir * rand(40, 120), vy: rand(-20, 20), life: 0.25, size: 2, color: '#bfeaff', shape: 'line', drag: 0.4 });
+    if (Math.abs(this.x - this.x0) > this.a.range || this.x < 20 || this.x > WORLD_W - 20) {
+      this.done = true;
+      b.fx.part(this.x, this.y, { vx: this.dir * 60, vy: 0, life: 0.2, size: 4, color: '#bfeaff' });
+    }
+  }
+  draw(c) {
+    const al = Math.min(1, this.t / 0.04);
+    if (this.a.big || this.a.pierce) { // 초승달 풍압 참격이 그대로 날아간다
+      if (drawVfx(c, 'seondal_crescent', this.x, this.y, this.a.pierce ? 190 : 140, { flip: this.dir < 0, alpha: al, add: this.a.pierce })) return;
+    } else if (drawVfx(c, 'seondal_blade', this.x + this.dir * 18, this.y, 130, { flip: this.dir < 0, rot: Math.PI + 0.63, ax: 0.1, ay: 0.95, alpha: al })) return;
+    c.save(); c.translate(this.x, this.y); c.scale(this.dir, 1);
+    c.strokeStyle = 'rgba(190,235,255,0.85)'; c.lineWidth = 4;
+    c.beginPath(); c.arc(-10, 0, this.w * 0.35, -1.1, 1.1); c.stroke();
+    c.restore();
+  }
+}
 class WindGust { // 만리추풍: wind blast travels forward, pierces, then explodes and pushes enemies away
   constructor(b, o) {
     this.b = b; this.o = o; this.dir = o.facing; this.x = o.x + this.dir * 50; this.y = o.y - 60; this.t = 0; this.hitT = new Map(); this.done = false; this.exploded = false;
@@ -1198,21 +1234,21 @@ class Battle {
   damageBoss(src, e, o = {}) {
     if (!e.alive) return 0;
     const cx = e.x, cy = e.y - e.h * 0.6;
-    if (src.yogi) {
-      // 간장 burns evil energy, 막야 seals/absorbs 요기 → 최호철's smoke techniques do nothing.
-      if (this.real - (e.lastNull || 0) > 0.18) {
+    if (src.yogi && !o.basic && !o.phys) {
+      // 간장 burns evil energy, 막야 swallows 요기 → 최호철's smoke techniques lose half their power.
+      // His fists and pipe strikes are plain physical blows and hit normally.
+      o = { ...o, yogiPart: true };
+      if (this.real - (e.lastNull || 0) > 0.5) {
         e.lastNull = this.real;
-        this.fx.text(cx, cy - 30, '무효', '#c9a6ff', 20);
+        this.fx.text(cx, cy - 34, '요기 반감', '#c9a6ff', 16);
         this.fx.spark(cx, cy, '#a77bff', 6, 200);
-        Sfx.play('block');
       }
       if (!o.noCount) { this.blockCount++; this.syn = Math.min(100, this.syn + 1.5); }
       if (!this.flags.nullified) {
         this.flags.nullified = true;
-        this.banner('요기 무력화!', '간장이 연기를 태우고 막야가 요기를 삼킨다 — 이동민으로 교대하라', '#b98cff', 3.4);
+        this.banner('요기 반감!', '간장·막야가 연기 술법을 절반 삼킨다 — 주먹으로 밀어붙이거나 이동민과 연계하라', '#b98cff', 3.4);
       }
       this.tryAssist();
-      return 0;
     }
     let dmg = src.atk * (o.mult || 1), crit = false;
     if (src.buffAtk > 0) dmg *= 1.1; // 흑풍맹호격 공격력 +10%
@@ -1223,16 +1259,16 @@ class Battle {
       if (e.dmHits % 5 === 0) { dmg *= 1.3; crit = true; this.fx.vfx('dongmin_mark', e.x, e.y - e.h * 0.55, 120, { life: 0.5, s0: 1.7, s1: 0.95, spin: 3 }); }
     }
     if (src.key === 'seondal' && o.basic) src.fanStacks = Math.min(5, src.fanStacks + 1); // 풍류의 잔상 축적
-    if (src.key === 'simcheong') { // 인당수의 한: 체력 40% 이하 치명 피해 +20%, 젖은 적 타격 시 피해의 4% 회복
-      if (src.hp / src.maxHp <= 0.4) { dmg *= 1.2; crit = true; }
+    if (src.key === 'simcheong') { // 인당수의 한: 체력 30% 이하 치명 피해 +20%, 젖은(심연수류) 적 타격 시 피해의 3% 회복
+      if (src.hp / src.maxHp <= HAN_HP) { dmg *= 1.2; crit = true; }
       if (e.soakT > 0 && src.hp < src.maxHp) {
-        src.hp = Math.min(src.maxHp, src.hp + dmg * 0.04);
-        if (src.hp / src.maxHp <= 0.4 && this.real - (src.lastRegenFx || 0) > 0.8) { src.lastRegenFx = this.real; this.fx.vfx('simcheong_regen', src.x, src.y + 6, 120, { ay: 0.96, life: 0.6, s0: 0.8, s1: 1.2 }); }
+        src.hp = Math.min(src.maxHp, src.hp + dmg * 0.03);
+        if (src.hp / src.maxHp <= HAN_HP && this.real - (src.lastRegenFx || 0) > 0.8) { src.lastRegenFx = this.real; this.fx.vfx('simcheong_regen', src.x, src.y + 6, 120, { ay: 0.96, life: 0.6, s0: 0.8, s1: 1.2 }); }
       }
     }
-    if (o.yogiPart) { // 심청이의 수류 술법은 요기 기반 — 막야가 절반을 삼킨다
+    if (o.yogiPart) { // 요기 술법(심청이의 수류 · 최호철의 연기) — 간장·막야가 절반을 삼킨다
       dmg *= 0.5;
-      if (this.real - (e.lastHalfTxt || 0) > 1.5) { e.lastHalfTxt = this.real; this.fx.text(cx, cy - 76, '막야가 요기 일부 흡수', '#c9a6ff', 13); }
+      if (!src.yogi && this.real - (e.lastHalfTxt || 0) > 1.5) { e.lastHalfTxt = this.real; this.fx.text(cx, cy - 76, '막야가 요기 일부 흡수', '#c9a6ff', 13); }
     }
     let tm = e.takenMult();
     if (o.guardIgnore && tm < 1) tm = 1; // 풍혈도륙: 방어 무시
@@ -1253,7 +1289,8 @@ class Battle {
     }
     if (!o.quiet || Math.random() < 0.3) this.fx.impact(cx + rand(-10, 10), cy + rand(-15, 15), crit ? '#ffe066' : '#ffffff');
     if (!o.quiet) { this.hitstop = Math.max(this.hitstop, crit ? 0.07 : 0.035); this.shake(crit ? 6 : 3); Sfx.play(crit ? 'crit' : 'hit'); }
-    src.ult = Math.min(100, src.ult + dmg / 14);
+    const hanX = src.key === 'simcheong' && src.hp / src.maxHp <= HAN_HP ? 2 : 1; // 인당수의 한: 위기 중 궁극기 충전 2배
+    src.ult = Math.min(100, src.ult + dmg / 14 * hanX);
     if (!this.synergy) this.syn = Math.min(100, this.syn + dmg / 22);
     return dmg;
   }
@@ -1269,6 +1306,7 @@ class Battle {
     if (p.buffDef > 0) dmg = Math.round(dmg * 0.75); // 시너지 방어 버프
     if (p.tigerAura) dmg = Math.round(dmg * 0.9);    // 맹호의 위압
     p.hp -= dmg; p.flash = 0.12; p.inv = 0.7; p.ult = Math.min(100, p.ult + dmg / 7);
+    if (p.key === 'simcheong' && p.hp > 0 && !p.hanAwoken && p.hp / p.maxHp <= HAN_HP) this.hanAwaken(p);
     this.stats.dmgTaken += dmg;
     const dir = sign(p.x - (o.from != null ? o.from : p.x - p.facing)) || -p.facing;
     if (!['ult', 'grab', 'grabdash'].includes(p.state)) { p.setState('hurt'); p.vx = dir * 300; p.vy = -260; p.onGround = false; }
@@ -1307,6 +1345,17 @@ class Battle {
     this.fx.ring(nxt.x, nxt.y - 64, 60, STYLES[nxt.key].aura, 0.3);
     this.fx.text(nxt.x, nxt.y - nxt.h - 30, nxt.d.name + ' 교대!', STYLES[nxt.key].aura, 18);
     Sfx.play('tag');
+  }
+  // 인당수의 한 — 죽음의 바다에서 되살아난 원한: 체력이 처음 30% 아래로 떨어지면 궁극기가 즉시 열린다 (전투당 1회).
+  // 다른 인원은 게이지를 모아야 궁극기를 쓰지만, 심청이는 위기 그 자체가 궁극기의 열쇠다.
+  hanAwaken(p) {
+    p.hanAwoken = true; p.ult = 100; p.inv = Math.max(p.inv, 1.0);
+    this.fx.vfx('simcheong_regen', p.x, p.y + 6, 220, { ay: 0.96, life: 1.1, s0: 0.6, s1: 1.4 });
+    this.fx.vfx('simcheong_lotus', p.x, p.y - 40, 260, { life: 0.9, s0: 0.5, s1: 1.2, add: true });
+    this.fx.text(p.x, p.y - p.h - 44, '인당수의 한 — 궁극기 개방!', '#ff7ab8', 20, 1.4);
+    this.skillCard(p.key, 'passive', p.d.passive.name);
+    this.banner('인당수의 한', '되살아난 원한 — 궁극기 즉시 개방 · 치명 피해 +20% · 궁극기 충전 2배', '#ff4a9a', 2.6);
+    this.shake(6); Sfx.play('water');
   }
   tryAssist() {
     const cur = this.player, other = this.party[1 - this.active];
@@ -1650,7 +1699,8 @@ class Battle {
     if (p.bound > 0) chip(`속박 ${p.bound.toFixed(1)}s`, '#7a4dff');
     if (p.key === 'hocheol' && o.key === 'dongmin' && !o.dead) chip(this.assistCd > 0 ? `파마해체 대기 ${Math.ceil(this.assistCd)}s` : '파마해체 준비', this.assistCd > 0 ? '#3a3a48' : '#a8242c');
     if (p.key === 'seondal') chip(`풍류의 잔상 ${p.fanStacks}/5`, p.fanStacks >= 5 ? '#2a7ab8' : '#2a3048');
-    if (p.key === 'simcheong' && p.hp / p.maxHp <= 0.4) chip('인당수의 한 — 치명 피해 +20%', '#8a1a4a');
+    if (p.key === 'simcheong' && p.hp / p.maxHp <= HAN_HP) chip('인당수의 한 — 치명 +20% · 궁극기 충전 2배', '#8a1a4a');
+    else if (p.key === 'simcheong' && !p.hanAwoken) chip('인당수의 한 — 체력 30% 이하 시 궁극기 개방', '#3a2040');
     if (p.buffAtk > 0 || p.buffDef > 0) chip('시너지 버프', '#8a5a1a');
     // bosses (top-right)
     const bx = 600, bw = 300;
@@ -1682,7 +1732,7 @@ class Battle {
       c.globalAlpha = Math.min(1, this.hintT);
       neonPanel(c, W / 2 - 240, 296, 480, 50, { r: 8 });
       c.font = `500 13px ${SANS}`; c.fillStyle = '#f2e2ea'; c.textAlign = 'center'; c.textBaseline = 'middle';
-      const l1 = this.hasYogiTrap ? '최호철의 연기 술법은 간장·막야 앞에서 무력화된다. 심청이의 수류는 절반만 통한다.' : '간장은 사악한 기운을 태우고, 막야는 요기를 삼킨다. 심청이의 수류는 절반만 통한다.';
+      const l1 = this.hasYogiTrap ? '최호철의 연기 술법과 심청이의 수류는 간장·막야가 절반을 삼킨다. 주먹·칼·부채는 정상 타격.' : '간장은 사악한 기운을 태우고, 막야는 요기를 삼킨다. 심청이의 수류는 절반만 통한다.';
       const l2 = '교대: ' + (Input.touch ? '좌측 대기 초상화' : 'Q / 좌측 대기 초상화') + ' · 합동기 게이지가 차면 ' + (Input.touch ? '합동기 버튼' : 'O 키') + ' — ' + this.synCfg.name;
       c.fillText(l1, W / 2, 313);
       c.fillText(l2, W / 2, 331);
@@ -1818,6 +1868,6 @@ class Battle {
     UI.button(c, bx, 316, 260, 48, '월드맵으로');
     UI.button(c, bx, 374, 260, 48, Sfx.muted ? '🔇 소리 켜기 [M]' : '🔊 소리 끄기 [M]');
     c.font = `500 13px ${SANS}`; c.fillStyle = '#bdb3a0';
-    c.fillText('최호철의 연기는 간장·막야에 무력화, 심청이의 수류는 절반만 통한다. 합동기 게이지가 차면 [O] / 합동기 버튼!', W / 2, 452);
+    c.fillText('최호철의 연기·심청이의 수류는 절반만 통한다. 합동기 게이지가 차면 [O] / 합동기 버튼!', W / 2, 452);
   }
 }
