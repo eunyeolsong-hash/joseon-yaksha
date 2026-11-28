@@ -2,7 +2,7 @@
 // ============================================================
 // battle.js — STAGE 1-5 「해님달님 — 원한의 끝」
 //   2-character tag party (any two of 이동민·최호철·김선달·심청이), 요기 matchup rule
-//   (간장·막야 absorb half of the 요기 술법 — 최호철's smoke skills and 심청이's 수류 술법; fists, blades and fans hit normally),
+//   (간장·막야 absorb half of the 요기 술법 — 최호철's smoke skills and 심청이's 용기 계열 기술; fists, blades, claws and fans hit normally),
 //   2인 시너지 합동기 (auto-assist 파마해체 for 최호철+이동민), twin-sword beam, 3 boss phases.
 // ============================================================
 const NO_INPUT = { held: () => false, pressed: () => false };
@@ -50,25 +50,32 @@ const CHAR_DATA = {
     passive: { name: '풍류의 잔상', hanja: '風流의 殘像' },
   },
   simcheong: {
-    name: '심청이', title: '용왕의 핏줄 · 수류 야차', hp: 1040, atk: 50, speed: 300, yogi: false,
+    name: '심청이', title: '용왕의 핏줄 · 용혈 야차', hp: 1040, atk: 50, speed: 300, yogi: false,
     combo: [
       { dur: 0.26, hitAt: 0.08, range: 92, height: 62, mult: 0.95, push: 80, lunge: 150, frame: 'simcheong_p3', fx: 'sword' },
       { dur: 0.28, hitAt: 0.09, range: 96, height: 70, mult: 1.0, push: 90, lunge: 150, frame: 'simcheong_p4', fx: 'swordUp' },
       { dur: 0.42, hitAt: 0.15, range: 118, height: 78, mult: 1.7, push: 260, lunge: 240, frame: 'simcheong_p5', fx: 'swordBig' },
     ],
-    frames: { idle: 'simcheong_p1', ready: 'simcheong_p3', air: 'simcheong_p2', dodge: 'simcheong_lunge', skill: 'simcheong_water', tagin: 'simcheong_p3', ult: ['simcheong_p2', 'simcheong_p5'], grab: 'simcheong_thrust' },
-    skill: { name: '심연수류', hanja: '深淵水流', cd: 7, desc: '전방 직선 물줄기 관통 + 3초간 이동·공격 30% 둔화' },
-    ult: { name: '흑련개화: 야차강림', hanja: '黑蓮開花: 夜叉降臨', desc: '흑련 영역으로 끌어당겨 지속 피해 → 내려찍기(2.5초 기절)' },
-    passive: { name: '인당수의 한', hanja: '印塘水之恨' },
+    frames: { idle: 'simcheong_p1', ready: 'simcheong_p3', air: 'simcheong_p2', dodge: 'simcheong_lunge', skill: 'simcheong_lunge', tagin: 'simcheong_p3', ult: ['simcheong_p2', 'simcheong_p5'], grab: 'simcheong_thrust' },
+    skill: { name: '용린참', hanja: '龍鱗斬', cd: 6, desc: '전방으로 돌진하며 베기 — 접근전의 시작점' },
+    dragonSkill: { name: '용왕의 포효', hanja: '龍王咆哮', cd: 6, desc: '용 형태 전용 — 전방 범위 용의 숨결 다단 히트' },
+    ult: { name: '용신강림', hanja: '龍神降臨', desc: '용의 기운을 모두 소모해 15초간 용 형태 — 최대 HP·공격력 증가, 용 발톱 평타' },
+    passive: { name: '용혈의 공명', hanja: '龍血共鳴' },
   },
 };
-// 심청이 용 변신 (야차강림 각성형) — 궁극기를 쓰면 변신, 궁극기가 끝난 뒤에도 DRAGON_DUR초 유지. 평타 피해 +25%.
-const DRAGON_DUR = 15;
+// 심청이 용 형태 (궁극기 「용신강림」) — DRAGON_DUR초 유지. 최대 HP +20% · 공격력 +25%, 평타는 용 발톱, 스킬은 용왕의 포효.
+// 용혈의 공명: 심청이는 일반 궁극기 충전 대신 "용의 기운"을 모은다 — 인간형 평타 적중 +DRAGON_QI.hit, 스킬 적중 +skill, 적 처치 +kill.
+const DRAGON_DUR = 15, DRAGON_HP = 1.2, DRAGON_ATK = 1.25;
+const DRAGON_QI = { hit: 4, skill: 12, kill: 30 };
+const DRAGON_COMBO = [ // 용 발톱 근접 공격
+  { dur: 0.3, hitAt: 0.1, range: 112, height: 84, mult: 1.0, push: 100, lunge: 170, fx: 'claw' },
+  { dur: 0.3, hitAt: 0.1, range: 112, height: 84, mult: 1.0, push: 100, lunge: 170, fx: 'claw2' },
+  { dur: 0.46, hitAt: 0.16, range: 140, height: 100, mult: 1.8, push: 280, lunge: 260, fx: 'clawBig' },
+];
 const DRAGON_FRAMES = {
   idle: 'simdragon_p1', ready: 'simdragon_p2', air: 'simdragon_p3', dodge: 'simdragon_p3', skill: 'simdragon_p4', tagin: 'simdragon_p5',
   grab: 'simdragon_p5', ult: ['simdragon_p4', 'simdragon_p5'], combo: ['simdragon_p3', 'simdragon_p5', 'simdragon_p4'],
 };
-const HAN_HP = 0.3; // 인당수의 한 발동 체력 (design doc: 30%)
 const PLAYABLE = ['dongmin', 'hocheol', 'seondal', 'simcheong'];
 
 // 2인 시너지 (design doc §2-3). Key = the two character keys sorted and joined with '+'.
@@ -294,6 +301,10 @@ class Player extends Fighter {
     const b = this.b, I = b.locked ? NO_INPUT : Input;
     this.st += dt;
     for (const k of ['inv', 'skillCd', 'sealed', 'bound', 'dodgeCd', 'flash', 'dropT', 'combatT', 'buffAtk', 'buffDef', 'dragonT']) if (this[k] > 0) this[k] = Math.max(0, this[k] - dt);
+    if (this.dragonOn && !this.dragon) { // 용 형태 해제 — 최대 HP 원래대로
+      this.dragonOn = false; this.maxHp = this.d.hp; this.hp = Math.min(this.hp, this.maxHp);
+      if (!this.dead) { b.fx.text(this.x, this.y - this.h - 30, '용 형태 해제', '#c9a6ff', 16); b.fx.ring(this.x, this.y - 60, 80, '#b57cff', 0.4); }
+    }
     if (this.dead) { this.vx *= Math.pow(0.05, dt); this.physics(dt); return; }
     if (this.key === 'hocheol') { // 맹호의 위압: 적이 무리 지어 다가오면(보스 둘 다 근접) 공격력 +10% · 받는 피해 -10%
       const near = b.liveBosses().filter(e => Math.abs(e.x - this.x) < 300).length;
@@ -326,7 +337,7 @@ class Player extends Fighter {
   }
   startDodge(d) { this.setState('dodge'); this.facing = d; this.vx = d * 640; this.inv = 0.3; this.dodgeCd = 0.55; Sfx.play('dodge'); }
   startAttack(i) {
-    const a = this.d.combo[i];
+    const a = this.combo[i];
     this.setState('attack'); this.comboIdx = i; this.queued = false; this.combatT = 2;
     this.vx = this.facing * a.lunge;
     Sfx.play(this.key === 'dongmin' || this.key === 'simcheong' ? 'slash' : 'swing');
@@ -335,7 +346,7 @@ class Player extends Fighter {
     const b = this.b;
     switch (this.state) {
       case 'attack': {
-        const a = this.d.combo[this.comboIdx];
+        const a = this.combo[this.comboIdx];
         this.vx *= Math.pow(0.0005, dt);
         if (!this.hitDone && this.st >= a.hitAt) { this.hitDone = true; this.doAttackHit(a); }
         if (I.pressed('attack') && this.st > a.dur * 0.3) this.queued = true;
@@ -343,7 +354,7 @@ class Player extends Fighter {
         if (I.pressed('skill') && this.skillCd <= 0) { if (dir) this.facing = dir; this.trySkill(); if (this.state !== 'attack') break; }
         if (I.pressed('ult') && this.ult >= 100) { if (dir) this.facing = dir; this.tryUlt(); break; }
         if (this.st >= a.dur) {
-          if (this.queued && this.comboIdx < this.d.combo.length - 1) { if (dir) this.facing = dir; this.startAttack(this.comboIdx + 1); }
+          if (this.queued && this.comboIdx < this.combo.length - 1) { if (dir) this.facing = dir; this.startAttack(this.comboIdx + 1); }
           else { this.state = 'idle'; this.comboIdx = 0; }
         }
         break;
@@ -381,7 +392,7 @@ class Player extends Fighter {
       fx.vfx('seondal_aura', this.x, this.y - this.h * 0.5, 170, { life: 0.55, s0: 0.7, s1: 1.35, spin: 5 });
       b.skillCard(this.key, 'passive', this.d.passive.name);
     }
-    const F = this.facing, fin = this.comboIdx === this.d.combo.length - 1, step = this.comboIdx;
+    const F = this.facing, fin = this.comboIdx === this.combo.length - 1, step = this.comboIdx;
     switch (a.fx) {
       // ── 이동민: 쌍검 — 붉은 검기 궤적이 번갈아 교차, 막타는 X자 돌진 참격
       case 'blade': case 'blade2': {
@@ -419,12 +430,21 @@ class Player extends Fighter {
         b.shake(5);
         break;
       }
+      // ── 심청이 용 형태: 용 발톱 — 보랏빛 세 줄 발톱 자국, 막타는 양손 할퀴기
+      case 'claw': case 'claw2': case 'clawBig': {
+        const big = a.fx === 'clawBig', up = a.fx === 'claw2', R = big ? 78 : 62;
+        for (let k = 0; k < 3; k++) fx.swing(this.x + F * (14 + k * 6), cy - 14 + k * 14, F, { r: R - k * 6, color: k === 1 ? '#ff6ac8' : '#a86cff', core: '#f6e8ff', thick: big ? 12 : 9, tilt: (up ? 0.55 : -0.35) + k * 0.05, flipY: up, life: big ? 0.28 : 0.22, sweep: 0.3 });
+        fx.vfx('hocheol_claw', this.x + F * 90, cy, big ? 230 : 170, { flip: F > 0, sy: up ? -0.85 : 0.85, life: big ? 0.32 : 0.24, s0: 0.7, s1: 1.1, add: true, fin: 0.03 });
+        if (big) { fx.vfx('simcheong_lotus', this.x + F * 90, cy + 10, 170, { life: 0.4, s0: 0.4, s1: 1.1, add: true, alpha: 0.85 }); b.shake(5); }
+        for (let i = 0; i < (big ? 10 : 5); i++) fx.part(this.x + F * rand(40, 110), cy + rand(-30, 30), { vx: F * rand(200, 420), vy: rand(-80, 80), life: 0.2, size: 2.4, color: i % 2 ? '#d9a8ff' : '#ff9ad8', shape: 'line', drag: 0.1 });
+        break;
+      }
       // ── 김선달: 부채 바람 투사체 (FanShot)
       case 'fan': case 'fanBig': // 부채를 휘두른 자리에 짧은 바람 + 투사체 발사
         fx.slash(x - this.facing * 6, cy, this.facing, a.fx === 'fanBig' ? 44 : 32, Math.random() < 0.5, pierce ? '#ffffff' : '#9fe0ff');
         for (let i = 0; i < 4; i++) fx.part(x, cy + rand(-14, 14), { vx: this.facing * rand(160, 320), vy: rand(-40, 40), life: 0.22, size: 2.2, color: '#bfeaff', shape: 'line', drag: 0.3 });
         Sfx.play('wind'); break;
-      // ── 심청이: 수류검 — 검은 물결이 검로를 따라 흐르고 물방울이 흩어진다. 용 변신 중엔 흑련(보라) 검기
+      // ── 심청이(인간형): 용혈검 — 분홍·물빛 검기가 검로를 따라 흐르고 물방울이 흩어진다
       case 'sword': case 'swordUp': case 'swordBig': {
         const dr = this.dragon, big = a.fx === 'swordBig', up = a.fx === 'swordUp';
         const col = dr ? '#b57cff' : '#ff5fa8', core = dr ? '#f3e0ff' : '#e6fbff', drop = dr ? '#d9a8ff' : '#8ad8ff';
@@ -450,22 +470,45 @@ class Player extends Fighter {
       this.b.fx.text(this.x, this.y - this.h - 20, '요기 봉인 — 술법 불가!', '#c49bff', 17); Sfx.play('block');
       this.b.tryAssist(); return;
     }
-    this.skillCd = this.d.skill.cd; this.combatT = 2.5;
-    this.b.fx.text(this.x, this.y - this.h - 34, this.d.skill.name, STYLES[this.key].aura, 20);
-    this.b.skillCard(this.key, 'active', this.d.skill.name);
+    const sk = this.skillInfo;
+    this.skillCd = sk.cd; this.combatT = 2.5;
+    this.b.fx.text(this.x, this.y - this.h - 34, sk.name, this.dragon ? '#d9a8ff' : STYLES[this.key].aura, 20);
+    this.b.skillCard(this.key, 'active', sk.name);
     if (this.key === 'dongmin') { this.setState('grabdash'); this.inv = 0.35; Sfx.play('dash'); }
+    else if (this.key === 'simcheong' && !this.dragon) { this.setState('skill'); this.skillHit = new Set(); this.inv = 0.25; Sfx.play('dash'); }
     else { this.setState('skill'); this.vx = 0; Sfx.play(this.key === 'hocheol' ? 'smoke' : this.key === 'seondal' ? 'wind' : 'water'); }
   }
   updateSkill() {
     const b = this.b;
+    if (this.key === 'simcheong') return this.dragon ? this.updateRoar() : this.updateScaleSlash();
     this.vx = 0;
     if (!this.hitDone && this.st >= 0.18) {
       this.hitDone = true;
       if (this.key === 'hocheol') b.zones.push(new SmokeTiger(b, this, this.x + this.facing * 140, this.y));          // 흑연호박
       else if (this.key === 'seondal') b.zones.push(new WindGust(b, this));                                           // 만리추풍
-      else if (this.key === 'simcheong') b.zones.push(new WaterSlash(b, this));                                       // 심연수류
     }
     if (this.st >= 0.55) this.state = 'idle';
+  }
+  updateScaleSlash() { // 용린참: 전방 돌진 베기 — 지나가는 길의 적을 한 번씩 벤다
+    const b = this.b, s = this.st, F = this.facing, cy = this.y - this.h * 0.55;
+    if (s < 0.28) {
+      this.vx = F * 940; b.fx.ghost(this.key, this.x, this.y, F, this.spriteFrame(b.t));
+      if (!this.hitDone) { this.hitDone = true; b.fx.vfx('simcheong_stream', this.x + F * 60, cy, 220, { flip: F > 0, sy: 0.35, life: 0.3, s0: 0.6, s1: 1.2, add: true, vx: F * 700 }); }
+      for (const e of b.liveBosses()) {
+        if (this.skillHit.has(e) || !rectsOverlap(this.frontRect(110, 96, -20), e.rect())) continue;
+        this.skillHit.add(e);
+        b.damageBoss(this, e, { mult: 1.9, push: 160, yogiPart: true, skillHit: true });
+        b.fx.swing(e.x - F * 40, e.y - e.h * 0.55, F, { r: 70, color: '#ff5fa8', core: '#ffffff', thick: 18, tilt: -0.2, life: 0.26 });
+        b.fx.swing(e.x - F * 30, e.y - e.h * 0.55, F, { r: 56, color: '#3fc8ff', core: '#ffffff', thick: 9, tilt: 0.3, flipY: true, life: 0.22 });
+        b.fx.vfx('simcheong_whirl', e.x, e.y - e.h * 0.55, 150, { life: 0.35, s0: 0.4, s1: 1.1, add: true, spin: F * 5 });
+      }
+    } else { this.vx *= 0.8; if (s >= 0.45) { this.state = 'idle'; this.vx = 0; } }
+  }
+  updateRoar() { // 용왕의 포효: 전방 용의 숨결 다단 히트
+    const b = this.b;
+    this.vx = 0;
+    if (!this.hitDone && this.st >= 0.15) { this.hitDone = true; b.zones.push(new DragonBreath(b, this)); b.shake(6); Sfx.play('boom'); }
+    if (this.st >= 0.85) this.state = 'idle';
   }
   updateGrabDash() { // 해체자의 악력 — dash & grab
     const b = this.b;
@@ -513,12 +556,13 @@ class Player extends Fighter {
     if (this.key === 'simcheong') this.transformDragon();
     Sfx.play('ult');
   }
-  transformDragon() { // 야차강림 — 심해의 용으로 각성
-    const b = this.b, fresh = !this.dragon;
-    this.dragonT = 1.75 + DRAGON_DUR; // 궁극기 연출 + 유지 시간
+  transformDragon() { // 용신강림 — 용의 기운을 모두 소모해 용 형태로 (최대 HP +20% · 공격력 +25%)
+    const b = this.b;
+    this.dragonT = 0.9 + DRAGON_DUR; // 궁극기 연출 + 유지 시간
+    if (!this.dragonOn) { this.dragonOn = true; const add = Math.round(this.d.hp * (DRAGON_HP - 1)); this.maxHp = this.d.hp + add; this.hp += add; }
     b.fx.vfx('simcheong_lotus', this.x, this.y - 50, 300, { life: 0.8, s0: 0.4, s1: 1.3, add: true });
     b.fx.ring(this.x, this.y - 60, 140, '#b57cff', 0.5, true);
-    if (fresh) b.fx.text(this.x, this.y - this.h - 60, '용 변신 — 야차강림!', '#d9a8ff', 22, 1.5);
+    b.fx.text(this.x, this.y - this.h - 60, '용신강림 — 용 형태!', '#d9a8ff', 22, 1.5);
   }
   updateUlt(dt) {
     const b = this.b, s = this.st;
@@ -534,12 +578,16 @@ class Player extends Fighter {
       if (s >= 0.8) { this.state = 'idle'; this.inv = 0.4; }
       return;
     }
-    if (this.key === 'simcheong') { // 흑련개화: 야차강림
+    if (this.key === 'simcheong') { // 용신강림: 변신 충격파로 주변을 밀어내며 용 형태 진입
       this.vx = 0;
-      if (this.ultStage === 0 && s >= 0.2) { this.ultStage = 1; b.zones.push(new LotusField(b, this, this.x + this.facing * 130)); Sfx.play('water'); }
-      if (this.ultStage === 1 && s >= 1.05) { this.ultStage = 2; this.vy = -720; this.vx = this.facing * 120; }
-      if (this.ultStage === 2 && s >= 1.4) { this.ultStage = 3; this.vy = 1100; }
-      if (s >= 1.75) { this.state = 'idle'; this.inv = 0.3; }
+      if (this.ultStage === 0 && s >= 0.3) {
+        this.ultStage = 2; b.shake(16); Sfx.play('boom');
+        b.fx.vfx('simcheong_descent', this.x, this.y + 12, 380, { ay: 0.93, life: 0.85, s0: 0.7, s1: 1.1 });
+        b.fx.vfx('simcheong_whirl', this.x, this.y - 6, 420, { sy: 0.35, life: 0.8, s0: 0.5, s1: 1.2, add: true, spin: 3 });
+        b.fx.ring(this.x, this.y, 280, '#b57cff', 0.6, true); b.fx.ring(this.x, this.y - 70, 200, '#ff7ab8', 0.5);
+        for (const e of b.liveBosses()) if (Math.abs(e.x - this.x) < 280) b.damageBoss(this, e, { mult: 2.4, push: 340, yogiPart: true });
+      }
+      if (s >= 0.9) { this.state = 'idle'; this.inv = 0.4; }
       return;
     }
     // 광인의 해체식: dash → flurry → overhead finisher
@@ -574,9 +622,11 @@ class Player extends Fighter {
   }
   // which doc-art pose to show for the current state
   get dragon() { return this.key === 'simcheong' && this.dragonT > 0 && !this.dead; }
+  get combo() { return this.dragon ? DRAGON_COMBO : this.d.combo; }
+  get skillInfo() { return this.dragon ? this.d.dragonSkill : this.d.skill; }
   spriteFrame(t) {
     const s = this.state, dr = this.dragon, F = dr ? DRAGON_FRAMES : this.d.frames;
-    if (s === 'attack') return dr ? F.combo[this.comboIdx] : this.d.combo[this.comboIdx].frame;
+    if (s === 'attack') return dr ? F.combo[this.comboIdx % 3] : this.combo[this.comboIdx].frame;
     if (s === 'dodge') return F.dodge;
     if (s === 'grabdash' || s === 'tagin') return F.tagin;
     if (s === 'grab') return F.grab;
@@ -601,7 +651,7 @@ class Player extends Fighter {
     const P = { t, flash: this.flash > 0, moving: this.state === 'move' && this.onGround, walk: this.walk, air: !this.onGround, emo: 'normal' };
     const s = this.state;
     if (s === 'attack') { // squash + small push on the hit frame
-      const a = this.d.combo[this.comboIdx], k = clamp(1 - Math.abs(this.st - a.hitAt) / 0.09, 0, 1);
+      const a = this.combo[this.comboIdx] || this.d.combo[0], k = clamp(1 - Math.abs(this.st - a.hitAt) / 0.09, 0, 1);
       P.squash = 0.07 * k; P.lunge = 7 * k; P.emo = 'angry';
     } else if (s === 'dodge') P.lean = 0.25;
     else if (s === 'hurt') { P.emo = 'shock'; P.lean = -0.35; }
@@ -624,7 +674,8 @@ class Player extends Fighter {
     if (!this.dead) { // painted passive auras (VFX sheet ①)
       if (this.key === 'seondal' && this.fanStacks >= 5) drawVfx(c, 'seondal_aura', this.x, this.y - this.h * 0.5, 150, { rot: t * 2.5, alpha: 0.6 + Math.sin(t * 6) * 0.15 });
       if (this.key === 'hocheol' && this.tigerAura) drawVfx(c, 'hocheol_eyes', this.x, this.y - this.h * 0.62, 230, { alpha: 0.55 + Math.sin(t * 4) * 0.12 });
-      if (this.key === 'simcheong' && this.hp / this.maxHp <= HAN_HP) drawVfx(c, 'simcheong_regen', this.x, this.y + 6, 130, { ay: 0.96, alpha: 0.5 + Math.sin(t * 5) * 0.15 });
+      if (this.dragon) drawVfx(c, 'simcheong_regen', this.x, this.y + 6, 150, { ay: 0.96, alpha: 0.35 + Math.sin(t * 5) * 0.12, add: true });
+      else if (this.key === 'simcheong' && this.ult >= 100) drawVfx(c, 'simcheong_regen', this.x, this.y + 6, 120, { ay: 0.96, alpha: 0.45 + Math.sin(t * 6) * 0.15 });
     }
     if (this.buffAtk > 0 || this.buffDef > 0) {
       c.strokeStyle = `rgba(255,200,120,${0.4 + Math.sin(t * 8) * 0.2})`; c.lineWidth = 2;
@@ -819,75 +870,36 @@ class FanVortex { // 천풍만리: 회오리가 적을 끌어당겨 지속 피�
     c.restore();
   }
 }
-class WaterSlash { // 심연수류: 검은 물줄기가 전방을 관통 — 적 이동·공격 속도 30% 감소(3초)
-  constructor(b, o) { this.b = b; this.o = o; this.dir = o.facing; this.x0 = o.x + this.dir * 30; this.y = o.y - 62; this.t = 0; this.len = 0; this.hit = new Set(); this.done = false; }
-  update(dt) {
-    const b = this.b; this.t += dt;
-    this.len = Math.min(470, this.len + 2400 * dt);
-    const x1 = this.x0 + this.dir * this.len;
-    const r = { x: Math.min(this.x0, x1), y: this.y - 50, w: Math.abs(x1 - this.x0), h: 100 };
-    for (const e of b.liveBosses()) {
-      if (this.hit.has(e) || !rectsOverlap(r, e.rect())) continue;
-      this.hit.add(e); b.damageBoss(this.o, e, { mult: 1.9, yogiPart: true, push: 120 });
-      e.soakT = 3; b.fx.text(e.x, e.y - e.h - 46, '둔화 30%', '#8ad8ff', 15);
-    }
-    for (let i = 0; i < 3; i++) b.fx.part(this.x0 + this.dir * rand(0, this.len), this.y + rand(-20, 20), { vx: this.dir * rand(60, 200), vy: rand(-90, 10), life: 0.45, size: rand(2, 4), color: Math.random() < 0.5 ? '#6ac8ff' : '#2a1a40', grav: 500 });
-    if (this.t > 0.55) this.done = true;
-  }
-  draw(c) {
-    const k = this.t < 0.4 ? 1 : Math.max(0, 1 - (this.t - 0.4) / 0.15), x1 = this.x0 + this.dir * this.len;
-    // 고압 직선 수류 참격: tip of the painted stream at the front, its length follows the jet
-    if (this.len > 20 && drawVfx(c, 'simcheong_stream', x1, this.y, Math.max(120, this.len * 0.93), { flip: this.dir < 0, rot: Math.PI + 0.51, ax: 0.04, ay: 0.95, alpha: k })) return;
-    c.save(); c.globalAlpha = k; c.lineCap = 'round';
-    c.strokeStyle = 'rgba(20,10,40,0.85)'; c.lineWidth = 34; seg(c, this.x0, this.y, x1, this.y);
-    c.strokeStyle = 'rgba(80,190,255,0.85)'; c.lineWidth = 16; seg(c, this.x0, this.y, x1, this.y);
-    c.strokeStyle = 'rgba(230,248,255,0.95)'; c.lineWidth = 4; seg(c, this.x0, this.y - 3, x1, this.y - 3);
-    c.restore();
-  }
-}
-class LotusField { // 흑련개화: 흑련 영역 — 끌어당김 + 지속 피해 → 야차 내려찍기(잃은 체력 비례 추가 피해 + 기절 2.5초)
-  constructor(b, o, x) { this.b = b; this.o = o; this.x = clamp(x, 80, WORLD_W - 80); this.y = GROUND_Y; this.t = 0; this.tick = 0; this.done = false; this.slam = false; }
+class DragonBreath { // 용왕의 포효: 전방 범위 용의 숨결 — 0.1초마다 다단 히트 (용기 술법: 막야가 절반 흡수)
+  constructor(b, o) { this.b = b; this.o = o; this.dir = o.facing; this.x0 = o.x + this.dir * 44; this.y = o.y - o.h * 0.6; this.t = 0; this.tick = 0; this.len = 0; this.done = false; }
   update(dt) {
     const b = this.b; this.t += dt; this.tick -= dt;
-    for (const e of b.liveBosses()) if (Math.abs(e.x - this.x) < 260 && !e.superArmor && !this.slam) e.kbv = sign(this.x - e.x) * 200;
-    if (!this.slam && this.tick <= 0) {
-      this.tick = 0.2;
-      for (const e of b.liveBosses()) if (Math.abs(e.x - this.x) < 230) { b.damageBoss(this.o, e, { mult: 0.4, quiet: true, yogiPart: true }); e.soakT = Math.max(e.soakT || 0, 1.5); }
+    this.x0 = this.o.x + this.dir * 44; this.y = this.o.y - this.o.h * 0.6;
+    this.len = Math.min(420, this.len + 1900 * dt);
+    const x1 = this.x0 + this.dir * this.len, sp = this.len * 0.22 + 20;
+    if (this.t < 0.85 && this.tick <= 0) {
+      this.tick = 0.1;
+      const r = { x: Math.min(this.x0, x1), y: this.y - sp, w: Math.abs(x1 - this.x0), h: sp * 2 };
+      for (const e of b.liveBosses()) if (rectsOverlap(r, e.rect())) { b.damageBoss(this.o, e, { mult: 0.4, push: 50, quiet: true, yogiPart: true, skillHit: true }); b.fx.flash(e.x - this.dir * 10, this.y + rand(-20, 20), 30, 'rgba(200,120,255,0.8)', -this.dir, { life: 0.1, spikes: 5 }); }
     }
-    if (Math.random() < dt * 30) b.fx.part(this.x + rand(-200, 200), this.y - rand(0, 30), { vy: -rand(60, 160), life: 0.8, size: rand(3, 6), color: Math.random() < 0.5 ? '#ff7ab8' : '#b07cff', shape: 'puff', grow: 3 });
-    if (!this.slam && this.t >= 1.3) {
-      this.slam = true; b.shake(20); Sfx.play('boom');
-      b.fx.ring(this.x, this.y, 260, '#ff6aa8', 0.6, true); b.fx.ring(this.x, this.y - 60, 200, '#b07cff', 0.5);
-      b.fx.vfx('simcheong_descent', this.x, this.y + 12, 360, { ay: 0.93, life: 0.85, s0: 0.8, s1: 1.1 });
-      for (const e of b.liveBosses()) if (Math.abs(e.x - this.x) < 240) {
-        const missing = (e.maxHp - e.hp) / e.maxHp;
-        b.damageBoss(this.o, e, { mult: 3.0 + missing * 4, stun: 2.5, yogiPart: true });
-      }
-    }
-    if (this.t > 1.7) this.done = true;
+    if (this.t < 0.85) for (let i = 0; i < 3; i++) { const d = rand(0.2, 1) * this.len; b.fx.part(this.x0 + this.dir * d, this.y + rand(-1, 1) * (d * 0.22 + 10), { vx: this.dir * rand(220, 460), vy: rand(-50, 50), life: 0.35, size: rand(4, 8), color: Math.random() < 0.5 ? 'rgba(217,168,255,0.8)' : 'rgba(255,122,184,0.8)', shape: 'puff', grow: 10, drag: 0.4 }); }
+    if (this.t > 1.0) this.done = true;
   }
   draw(c) {
-    const k = this.t < 0.2 ? this.t / 0.2 : this.t > 1.4 ? Math.max(0, 1 - (this.t - 1.4) / 0.3) : 1, bloom = easeOut(clamp(this.t / 0.6, 0, 1));
-    if (Assets.vfxReady('simcheong_whirl') && Assets.vfxReady('simcheong_lotus')) {
-      // 심해 소용돌이 견인 (flat on the ground, spinning) under the 거대 흑련 만개 영역
-      drawVfx(c, 'simcheong_whirl', this.x, this.y - 4, 520 * (0.5 + 0.5 * bloom), { sy: 0.32, rot: this.t * 5, alpha: k * 0.9 });
-      drawVfx(c, 'simcheong_lotus', this.x, this.y + 18, 430 * (0.3 + 0.7 * bloom), { ay: 0.78, alpha: k });
-      return;
-    }
-    c.save(); c.globalAlpha = k * 0.9; c.translate(this.x, this.y);
-    c.fillStyle = 'rgba(30,10,40,0.55)'; c.beginPath(); c.ellipse(0, 0, 240, 50, 0, 0, Math.PI * 2); c.fill();
-    for (let i = 0; i < 8; i++) { // 검은 연꽃 꽃잎
-      const a = -Math.PI / 2 + (i - 3.5) * 0.36;
-      c.save(); c.rotate(a + Math.PI / 2); c.scale(1, bloom);
-      const g = c.createLinearGradient(0, 0, 0, -150); g.addColorStop(0, 'rgba(30,8,40,0.95)'); g.addColorStop(1, 'rgba(255,100,180,0.75)');
-      c.fillStyle = g; c.beginPath(); c.moveTo(0, 0); c.quadraticCurveTo(-34, -80, 0, -150); c.quadraticCurveTo(34, -80, 0, 0); c.fill();
-      c.restore();
+    const k = this.t < 0.85 ? 1 : Math.max(0, 1 - (this.t - 0.85) / 0.15), x1 = this.x0 + this.dir * this.len;
+    const sp = this.len * 0.22 + 20, wob = Math.sin(this.t * 38) * 5;
+    c.save(); c.globalCompositeOperation = 'lighter';
+    for (const [m, al] of [[1, 0.55], [0.5, 0.8]]) {
+      const g = c.createLinearGradient(this.x0, 0, x1, 0);
+      g.addColorStop(0, `rgba(255,240,255,${al})`); g.addColorStop(0.35, `rgba(190,110,255,${al * 0.8})`); g.addColorStop(1, 'rgba(255,90,170,0)');
+      c.globalAlpha = k; c.fillStyle = g;
+      c.beginPath(); c.moveTo(this.x0, this.y - 10 * m); c.lineTo(x1, this.y - sp * m + wob); c.lineTo(x1, this.y + sp * m - wob); c.lineTo(this.x0, this.y + 10 * m); c.closePath(); c.fill();
     }
     c.restore();
+    if (this.len > 40) drawVfx(c, 'simcheong_stream', x1, this.y, this.len * 0.95, { flip: this.dir < 0, rot: Math.PI + 0.51, ax: 0.04, ay: 0.95, alpha: k * 0.9, add: true });
+    drawVfx(c, 'simcheong_whirl', this.x0, this.y, 110, { rot: this.t * 9, alpha: k, add: true });
   }
 }
-
-// ---------------- 2인 시너지 합동기 (design doc §2-3) ----------------
 class Synergy {
   constructor(b, cfg, lead, partner) {
     this.b = b; this.cfg = cfg; this.lead = lead; this.partner = partner; this.t = 0; this.tick = 0; this.done = false; this.final = false;
@@ -1101,7 +1113,7 @@ class Boss extends Fighter {
   }
   draw(c, t) {
     this.drawShadow(c, 24);
-    if (this.soakT > 0 && this.alive) { // 심연수류 둔화 — 물에 젖음
+    if (this.soakT > 0 && this.alive) { // 물에 젖음(합동기 흑수풍운) — 둔화
       c.fillStyle = 'rgba(90,190,255,0.75)';
       for (let i = 0; i < 4; i++) { const yy = this.y - this.h + ((t * 90 + i * 30) % this.h); circle(c, this.x - 14 + i * 9, yy, 2.2); c.fill(); }
     }
@@ -1387,21 +1399,19 @@ class Battle {
     let dmg = src.atk * (o.mult || 1), crit = false;
     if (src.buffAtk > 0) dmg *= 1.1; // 흑풍맹호격 공격력 +10%
     if (src.tigerAura) dmg *= 1.1;   // 맹호의 위압
-    if (src.key === 'dongmin') { // 해체 본능: +3% per 10 hits on the same target, every 5th hit is a +30% 급소 일격
+    if (src.key === 'dongmin') { // 해체 본능: 같은 적을 10타 때릴 때마다 피해 +3% (최대 +30%)
       e.dmHits++;
-      dmg *= 1 + 0.03 * Math.min(10, Math.floor(e.dmHits / 10));
-      if (e.dmHits % 5 === 0) { dmg *= 1.3; crit = true; this.fx.vfx('dongmin_mark', e.x, e.y - e.h * 0.55, 120, { life: 0.5, s0: 1.7, s1: 0.95, spin: 3 }); }
-    }
-    if (src.key === 'seondal' && o.basic) src.fanStacks = Math.min(5, src.fanStacks + 1); // 풍류의 잔상 축적
-    if (src.key === 'simcheong' && src.dragon && o.basic) dmg *= 1.25; // 용 변신: 평타 피해 +25%
-    if (src.key === 'simcheong') { // 인당수의 한: 체력 30% 이하 치명 피해 +20%, 젖은(심연수류) 적 타격 시 피해의 3% 회복
-      if (src.hp / src.maxHp <= HAN_HP) { dmg *= 1.2; crit = true; }
-      if (e.soakT > 0 && src.hp < src.maxHp) {
-        src.hp = Math.min(src.maxHp, src.hp + dmg * 0.03);
-        if (src.hp / src.maxHp <= HAN_HP && this.real - (src.lastRegenFx || 0) > 0.8) { src.lastRegenFx = this.real; this.fx.vfx('simcheong_regen', src.x, src.y + 6, 120, { ay: 0.96, life: 0.6, s0: 0.8, s1: 1.2 }); }
+      const tier = Math.min(10, Math.floor(e.dmHits / 10));
+      dmg *= 1 + 0.03 * tier;
+      if (e.dmHits % 10 === 0 && e.dmHits <= 100) {
+        this.fx.vfx('dongmin_mark', e.x, e.y - e.h * 0.55, 120, { life: 0.5, s0: 1.7, s1: 0.95, spin: 3 });
+        this.fx.text(e.x, e.y - e.h - 52, `해체 본능 +${tier * 3}%`, '#ff6a7a', 16);
+        if (tier === 1 || tier === 10) this.skillCard('dongmin', 'passive', CHAR_DATA.dongmin.passive.name);
       }
     }
-    if (o.yogiPart) { // 요기 술법(심청이의 수류 · 최호철의 연기) — 간장·막야가 절반을 삼킨다
+    if (src.key === 'seondal' && o.basic) src.fanStacks = Math.min(5, src.fanStacks + 1); // 풍류의 잔상 축적
+    if (src.key === 'simcheong' && src.dragon) dmg *= DRAGON_ATK; // 용신강림: 용 형태 공격력 +25%
+    if (o.yogiPart) { // 요기 술법(심청이의 용기 기술 · 최호철의 연기) — 간장·막야가 절반을 삼킨다
       dmg *= 0.5;
       if (!src.yogi && this.real - (e.lastHalfTxt || 0) > 1.5) { e.lastHalfTxt = this.real; this.fx.text(cx, cy - 76, '막야가 요기 일부 흡수', '#c9a6ff', 13); }
     }
@@ -1425,8 +1435,9 @@ class Battle {
     if (!o.quiet || Math.random() < 0.3) this.fx.impact(cx + rand(-10, 10), cy + rand(-15, 15), crit ? '#ffe066' : '#ffffff');
     if (o.basic) this.basicHitFx(src, e, cx, cy, !!o.fin, crit);
     if (!o.quiet) { this.hitstop = Math.max(this.hitstop, crit ? 0.07 : 0.035); this.shake(crit ? 6 : 3); Sfx.play(crit ? 'crit' : 'hit'); }
-    const hanX = src.key === 'simcheong' && src.hp / src.maxHp <= HAN_HP ? 2 : 1; // 인당수의 한: 위기 중 궁극기 충전 2배
-    src.ult = Math.min(100, src.ult + dmg / 14 * hanX);
+    if (src.key === 'simcheong') { // 용혈의 공명: 인간형 평타·스킬 적중으로 용의 기운 축적 (용 형태 중엔 축적 없음)
+      if (!src.dragon && (o.basic || o.skillHit)) this.addQi(src, o.skillHit ? DRAGON_QI.skill : DRAGON_QI.hit);
+    } else src.ult = Math.min(100, src.ult + dmg / 14);
     if (!this.synergy) this.addSyn(dmg / 15);
     return dmg;
   }
@@ -1455,14 +1466,13 @@ class Battle {
     if (p.dead || (this.state !== 'fight' && this.state !== 'intro')) return 'inv';
     if (p.state === 'dodge') {
       this.fx.text(p.x, p.y - p.h - 14, '회피!', '#9fe8ff', 18); Sfx.play('dodge');
-      p.ult = Math.min(100, p.ult + 6);
+      if (p.key !== 'simcheong') p.ult = Math.min(100, p.ult + 6);
       return 'dodged';
     }
     if (p.inv > 0) return 'inv';
     if (p.buffDef > 0) dmg = Math.round(dmg * 0.75); // 시너지 방어 버프
     if (p.tigerAura) dmg = Math.round(dmg * 0.9);    // 맹호의 위압
-    p.hp -= dmg; p.flash = 0.12; p.inv = 0.7; p.ult = Math.min(100, p.ult + dmg / 7);
-    if (p.key === 'simcheong' && p.hp > 0 && !p.hanAwoken && p.hp / p.maxHp <= HAN_HP) this.hanAwaken(p);
+    p.hp -= dmg; p.flash = 0.12; p.inv = 0.7; if (p.key !== 'simcheong') p.ult = Math.min(100, p.ult + dmg / 7);
     this.stats.dmgTaken += dmg;
     const dir = sign(p.x - (o.from != null ? o.from : p.x - p.facing)) || -p.facing;
     if (!['ult', 'grab', 'grabdash'].includes(p.state)) { p.setState('hurt'); p.vx = dir * 300; p.vy = -260; p.onGround = false; }
@@ -1503,16 +1513,16 @@ class Battle {
     this.fx.text(nxt.x, nxt.y - nxt.h - 30, nxt.d.name + ' 교대!', STYLES[nxt.key].aura, 18);
     Sfx.play('tag');
   }
-  // 인당수의 한 — 죽음의 바다에서 되살아난 원한: 체력이 처음 30% 아래로 떨어지면 궁극기가 즉시 열린다 (전투당 1회).
-  // 다른 인원은 게이지를 모아야 궁극기를 쓰지만, 심청이는 위기 그 자체가 궁극기의 열쇠다.
-  hanAwaken(p) {
-    p.hanAwoken = true; p.ult = 100; p.inv = Math.max(p.inv, 1.0);
-    this.fx.vfx('simcheong_regen', p.x, p.y + 6, 220, { ay: 0.96, life: 1.1, s0: 0.6, s1: 1.4 });
-    this.fx.vfx('simcheong_lotus', p.x, p.y - 40, 260, { life: 0.9, s0: 0.5, s1: 1.2, add: true });
-    this.fx.text(p.x, p.y - p.h - 44, '인당수의 한 — 궁극기 개방!', '#ff7ab8', 20, 1.4);
-    this.skillCard(p.key, 'passive', p.d.passive.name);
-    this.banner('인당수의 한', '되살아난 원한 — 궁극기 즉시 개방 · 치명 피해 +20% · 궁극기 충전 2배', '#ff4a9a', 2.6);
-    this.shake(6); Sfx.play('water');
+  // 용혈의 공명 — 용의 기운 축적. 가득 차면 궁극기 「용신강림」 해금.
+  addQi(p, v) {
+    if (p.ult >= 100) return;
+    p.ult = Math.min(100, p.ult + v);
+    if (p.ult >= 100) {
+      this.fx.vfx('simcheong_regen', p.x, p.y + 6, 200, { ay: 0.96, life: 0.9, s0: 0.6, s1: 1.3 });
+      this.fx.text(p.x, p.y - p.h - 44, '용의 기운 가득 — 용신강림!', '#ff9ad8', 19, 1.4);
+      this.skillCard(p.key, 'passive', p.d.passive.name);
+      Sfx.play('water');
+    }
   }
   tryAssist() {
     const cur = this.player, other = this.party[1 - this.active];
@@ -1590,6 +1600,7 @@ class Battle {
     } else if (this.phase === 2) {
       if (d.hp <= 0 && !d.subdued) {
         d.subdued = true; d.go('down');
+        for (const q of this.party) if (q.key === 'simcheong' && !q.dead && !q.dragon) this.addQi(q, DRAGON_QI.kill); // 용혈의 공명: 적 처치
         if (this.beam) { this.beam = null; if (h.alive) h.go('idle'); }
         this.banner('달님 제압!', '막야가 손에서 떨어졌다', '#b98cff', 1.6);
         this.phase3T = 1.7;
@@ -1643,7 +1654,7 @@ class Battle {
 
     this.player.update(sdt);
     const fighting = this.state === 'fight';
-    for (const e of this.bosses) { const edt = sdt * (e.soakT > 0 ? 0.7 : 1); if (fighting) e.update(edt); else e.idleUpdate(edt); } // 심연수류 둔화 30%
+    for (const e of this.bosses) { const edt = sdt * (e.soakT > 0 ? 0.7 : 1); if (fighting) e.update(edt); else e.idleUpdate(edt); } // 젖음 둔화 30% (흑수풍운)
     for (const pr of this.projectiles) pr.update(sdt, this);
     this.projectiles = this.projectiles.filter(p => !p.done);
     for (const z of this.zones) z.update(sdt);
@@ -1681,9 +1692,9 @@ class Battle {
       seg(c, h.x, h.y - 75, d.x, d.y - 75); c.setLineDash([]);
     }
     for (const e of this.bosses) e.draw(c, this.t);
-    if (this.player.key === 'dongmin') for (const e of this.bosses) { // 해체 본능 급소 조준 표식 — 5타째가 급소
-      const st = e.dmHits % 5;
-      if (e.alive && e.dmHits > 0 && st >= 2) drawVfx(c, 'dongmin_markS', e.x, e.y - e.h * 0.55, 34 + st * 9, { rot: this.real * 2, alpha: 0.35 + st * 0.15 });
+    if (this.player.key === 'dongmin') for (const e of this.bosses) { // 해체 본능 표식 — 누적 단계(10타당 +3%)만큼 커진다
+      const tier = Math.min(10, Math.floor(e.dmHits / 10));
+      if (e.alive && tier > 0) drawVfx(c, 'dongmin_markS', e.x, e.y - e.h * 0.55, 34 + tier * 5, { rot: this.real * 2, alpha: 0.3 + tier * 0.05 });
     }
     if (this.assist) this.assist.draw(c, this.t);
     if (this.synergy) this.synergy.draw(c, this.t);
@@ -1834,9 +1845,10 @@ class Battle {
     c.font = `500 11px ${SANS}`; outlinedText(c, p.d.title, 110 + nw, 22, '#e0c8d8', '#000', 3);
     this.bar(c, 98, 28, 290, 17, p.hp / p.maxHp, '#e0232e', '#3a0a12', `${Math.ceil(p.hp)} / ${p.maxHp}`);
     const full = p.ult >= 100;
-    this.bar(c, 98, 50, 240, 8, p.ult / 100, full ? `hsl(${45 + Math.sin(this.real * 8) * 10},100%,65%)` : '#d9a440', '#2a1a10');
+    this.bar(c, 98, 50, 240, 8, p.dragon ? p.dragonT / (DRAGON_DUR + 0.9) : p.ult / 100, p.dragon ? '#b57cff' : p.key === 'simcheong' && !full ? '#e070b8' : full ? `hsl(${45 + Math.sin(this.real * 8) * 10},100%,65%)` : '#d9a440', '#2a1a10');
     c.font = `700 10px ${SANS}`; c.textAlign = 'left';
-    outlinedText(c, full ? '궁극기 준비!  ' + p.d.ult.name : '궁극기 ' + Math.floor(p.ult) + '%', 100, 72, full ? '#ffe27a' : '#d8c8b0', '#000', 3);
+    const qi = p.key === 'simcheong';
+    outlinedText(c, p.dragon ? `용 형태 ${Math.ceil(p.dragonT)}초 — 공격력 +25% · 최대 HP +20%` : full ? (qi ? '용의 기운 가득!  ' : '궁극기 준비!  ') + p.d.ult.name : (qi ? '용의 기운 ' : '궁극기 ') + Math.floor(p.ult) + '%', 100, 72, p.dragon ? '#e0c0ff' : full ? '#ffe27a' : qi ? '#f0b8e0' : '#d8c8b0', '#000', 3);
     // standby (tag) slot below
     const tx = 40, ty = 128;
     this.portraitCircle(c, o.key, tx, ty, 25, o.dead);
@@ -1862,9 +1874,9 @@ class Battle {
     if (p.bound > 0) chip(`속박 ${p.bound.toFixed(1)}s`, '#7a4dff');
     if (p.key === 'hocheol' && o.key === 'dongmin' && !o.dead) chip(this.assistCd > 0 ? `파마해체 대기 ${Math.ceil(this.assistCd)}s` : '파마해체 준비', this.assistCd > 0 ? '#3a3a48' : '#a8242c');
     if (p.key === 'seondal') chip(`풍류의 잔상 ${p.fanStacks}/5`, p.fanStacks >= 5 ? '#2a7ab8' : '#2a3048');
-    if (p.dragon) chip(`용 변신 ${Math.ceil(p.dragonT)}s — 평타 +25%`, '#6a2cc0');
-    if (p.key === 'simcheong' && p.hp / p.maxHp <= HAN_HP) chip('인당수의 한 — 치명 +20% · 궁극기 충전 2배', '#8a1a4a');
-    else if (p.key === 'simcheong' && !p.hanAwoken) chip('인당수의 한 — 체력 30% 이하 시 궁극기 개방', '#3a2040');
+    if (p.dragon) chip(`용 형태 ${Math.ceil(p.dragonT)}s — 용 발톱 · 용왕의 포효`, '#6a2cc0');
+    else if (p.key === 'simcheong') chip(`용혈의 공명 — 용의 기운 ${Math.floor(p.ult)}%`, p.ult >= 100 ? '#a0306a' : '#3a2040');
+    if (p.key === 'dongmin') { const tier = Math.max(0, ...this.bosses.map(e => Math.min(10, Math.floor(e.dmHits / 10)))); chip(`해체 본능 +${tier * 3}%`, tier >= 10 ? '#a8242c' : '#3a2030'); }
     if (p.buffAtk > 0 || p.buffDef > 0) chip('시너지 버프', '#8a5a1a');
     // bosses (top-right)
     const bx = 600, bw = 300;
@@ -1896,7 +1908,7 @@ class Battle {
       c.globalAlpha = Math.min(1, this.hintT);
       neonPanel(c, W / 2 - 240, 296, 480, 50, { r: 8 });
       c.font = `500 13px ${SANS}`; c.fillStyle = '#f2e2ea'; c.textAlign = 'center'; c.textBaseline = 'middle';
-      const l1 = this.hasYogiTrap ? '최호철의 연기 술법과 심청이의 수류는 간장·막야가 절반을 삼킨다. 주먹·칼·부채는 정상 타격.' : '간장은 사악한 기운을 태우고, 막야는 요기를 삼킨다. 심청이의 수류는 절반만 통한다.';
+      const l1 = this.hasYogiTrap ? '최호철의 연기 술법과 심청이의 용기 기술은 간장·막야가 절반을 삼킨다. 주먹·칼·발톱·부채는 정상 타격.' : '간장은 사악한 기운을 태우고, 막야는 요기를 삼킨다. 심청이의 용기 기술(용린참·포효·용신강림)은 절반만 통한다.';
       const l2 = '교대: ' + (Input.touch ? '좌측 대기 초상화' : 'Q / 좌측 대기 초상화') + ' · 합동기 게이지가 차면 ' + (Input.touch ? '합동기 버튼' : 'O 키') + ' — ' + this.synCfg.name;
       c.fillText(l1, W / 2, 313);
       c.fillText(l2, W / 2, 331);
@@ -1969,7 +1981,7 @@ class Battle {
       c.strokeStyle = 'rgba(255,200,210,0.35)'; c.lineWidth = 1; circle(c, b.x, b.y, b.r - 5); c.stroke();
       if (b.action === 'skill' || b.action === 'ult') { // the doc's skill illustration as the button face
         c.globalAlpha = ready ? 1 : 0.4;
-        drawSkillCircle(c, 'skill.' + p.key + '.' + (b.action === 'skill' ? 'active' : 'ult'), b.x, b.y, b.r - 4, 0.45, 0.4);
+        drawSkillCircle(c, 'skill.' + p.key + '.' + (b.action === 'skill' && !p.dragon ? 'active' : 'ult'), b.x, b.y, b.r - 4, 0.45, 0.4);
         c.fillStyle = 'rgba(0,0,0,0.25)'; circle(c, b.x, b.y, b.r - 4); c.fill();
       } else if (b.action === 'synergy') { // both members' faces
         const o = this.party[1 - this.active];
@@ -1987,11 +1999,11 @@ class Battle {
       c.globalAlpha = 1;
       if (b.action === 'skill' && p.skillCd > 0) {
         c.fillStyle = 'rgba(0,0,0,0.6)'; c.beginPath(); c.moveTo(b.x, b.y);
-        c.arc(b.x, b.y, b.r - 2, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (p.skillCd / p.d.skill.cd)); c.closePath(); c.fill();
+        c.arc(b.x, b.y, b.r - 2, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (p.skillCd / p.skillInfo.cd)); c.closePath(); c.fill();
         c.font = `800 13px ${SANS}`; outlinedText(c, p.skillCd.toFixed(1), b.x, b.y, '#fff', '#000', 3);
       }
       if (b.action === 'ult') { c.strokeStyle = '#ffd34d'; c.lineWidth = 4; c.beginPath(); c.arc(b.x, b.y, b.r + 5, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (p.ult / 100)); c.stroke(); }
-      const lab = b.action === 'skill' ? p.d.skill.name : b.action === 'ult' ? p.d.ult.name.split(':')[0] : b.action === 'synergy' ? this.synCfg.name : b.label;
+      const lab = b.action === 'skill' ? p.skillInfo.name : b.action === 'ult' ? p.d.ult.name.split(':')[0] : b.action === 'synergy' ? this.synCfg.name : b.label;
       c.font = `800 ${b.action === 'skill' || b.action === 'ult' || b.action === 'synergy' ? 9 : 10}px ${SANS}`;
       outlinedText(c, lab, b.x, b.action === 'skill' || b.action === 'ult' || b.action === 'synergy' ? b.y + b.r + 9 : b.y + b.r * (b.r > 45 ? 0.62 : 0.58), '#ffe2ea', '#000', 3);
     }
@@ -2032,6 +2044,6 @@ class Battle {
     UI.button(c, bx, 316, 260, 48, '월드맵으로');
     UI.button(c, bx, 374, 260, 48, Sfx.muted ? '🔇 소리 켜기 [M]' : '🔊 소리 끄기 [M]');
     c.font = `500 13px ${SANS}`; c.fillStyle = '#bdb3a0';
-    c.fillText('최호철의 연기·심청이의 수류는 절반만 통한다. 합동기 게이지가 차면 [O] / 합동기 버튼!', W / 2, 452);
+    c.fillText('최호철의 연기·심청이의 용기 기술은 절반만 통한다. 합동기 게이지가 차면 [O] / 합동기 버튼!', W / 2, 452);
   }
 }

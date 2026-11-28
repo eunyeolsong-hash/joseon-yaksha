@@ -169,19 +169,21 @@ const STORY_11 = [
   { narr: true, text: 'STAGE 1-1 · 신령의 시험 — 휘모리의 뿌리를 쫓던 월광대 앞에, 초월적인 존재가 모습을 드러낸다.' },
   { who: 'seondal', side: 'left', emo: 'smirk', text: '의정부 사건 전에 꼭 들러야 할 데가 있다더니… 여기야? 분위기 한번 고약하네.' },
   { who: 'dongmin', side: 'left', emo: 'normal', text: '반장님, 기운이 이상합니다. 사람도 요괴도 아닌 게 있어요.' },
-  { who: 'spirit', side: 'right', text: '월광대인가. 조선의 비밀을 알고 싶다면, 그 자격부터 증명해라.' },
-  { who: 'seondal', side: 'left', emo: 'smile', text: '자격이라… 일단 이거라도 드시면서 얘기하시죠. 초코바인데.' },
-  { who: 'spirit', side: 'right', text: '거래는 그렇게 하는 게 아니다. 내 환영과 기운, 순간이동을 견뎌 내라. 그것이 시험이다.' },
+  { who: 'spirit', side: 'right', text: '월광대인가. 무슨 일로 이 깊은 곳까지 찾아왔느냐.' },
+  { who: 'seondal', side: 'left', emo: 'smile', text: '휘모리의 뿌리를 알고 싶어서요. 일단 이거라도 드시면서 얘기하시죠. 초코바인데.' },
+  { who: 'spirit', side: 'right', text: '초코바론 어림없지. 조선의 비밀을 파헤치고 싶다면, 그만한 자질이 있는지 시험을 볼 필요가 있겠어.' },
+  { who: 'spirit', side: 'right', text: '나를 이기면 나의 기억을 보여주마. 내 환영과 기운, 순간이동을 견뎌 내라.' },
   { narr: true, text: '퀘스트 — 신령님의 HP를 0으로 만들기. 죽이기 위한 싸움이 아닌, 자질을 확인하는 시험이다.' },
   { narr: true, text: '환영이 흩어지고 원거리 기운이 잦아들었다. 시험 종료.' },
   { who: 'spirit', side: 'right', text: '합격이다. 약속대로 내 기억을 보여 주마. …도깨비왕이 숨을 거두던 그날을.' },
   { narr: true, text: '도깨비왕의 죽음, 전국으로 흩어지는 일곱 개의 칠정 구슬. 휘모리는 그날 시작되었다.' },
-  { who: 'spirit', side: 'right', text: '상처 하나 없이 시험을 마친 자에게는 이것을 주지. 「신령님의 신상패딩」 — 체력이 덜 닳을 것이다.' },
+  { who: 'spirit', side: 'right', text: '상처 하나 없이 시험을 마친 자에게는 이것을 주지. 「신령님의 신상패딩」 — 받는 상처가 조금은 덜할 것이다.' },
   { narr: true, text: '보상 — 신령님의 기억 열람, STAGE 1-2 해금. (노데미지 특별 클리어: 보조 아이템 「신령님의 신상패딩」)' },
 ];
 const STORY_12 = [
   { narr: true, text: 'STAGE 1-2 · 땅굴대장의 부적 — 의정부 조사가 시작된다.' },
   { who: 'thug', side: 'right', text: '어이, 월광대 양반들. 땅굴대장 부르는 부적을 찾는다며? 공짜는 없지. 값은 좀 쳐 주셔야겠는데.' },
+  { who: 'seondal', side: 'left', emo: 'smirk', text: '우리가 그렇게 만만해 보이나?' },
   { who: 'dongmin', side: 'left', emo: 'angry', text: '협박이면, 대가가 좀 셀 텐데.' },
   { who: 'thug', side: 'right', text: '얘들아, 손님들 주머니 좀 털어 드려라!' },
   { narr: true, text: '퀘스트 — 하급요괴 4마리를 처치한 뒤 미니보스 「수상한 인물」 제압.' },
@@ -195,6 +197,8 @@ const STORY_12 = [
 const STORY_13 = [
   { narr: true, text: 'STAGE 1-3 · 인호 전쟁의 원한 — 인호 전쟁에서 희생된 이들의 원한이 원귀가 되어 몰려든다.' },
   { who: 'dongmin', side: 'left', emo: 'normal', text: '저 구슬… 맞으면 그냥 다치는 게 아니라 원한이 들러붙는 느낌입니다.' },
+  { who: 'seondal', side: 'left', emo: 'normal', text: '숫자가 많아. 하나씩 상대하다간 끝이 없겠는데.' },
+  { who: 'hocheol', side: 'right', emo: 'smirk', text: '그렇다면 나의 연기 술법이 최적이겠군.' },
   { who: 'hocheol', side: 'right', emo: 'shout', text: '물러서 있어라. 한꺼번에 묶는다 — 흑연호박!' },
   { narr: true, text: '최호철의 담뱃대에서 검은 요기가 피어올라, 호랑이 형상의 연기가 원귀들을 휘감았다.' },
   { narr: true, text: '퀘스트 — 「원한 구슬」을 쏘는 원귀 4마리와 대형 원귀 1마리 제압.' },
@@ -212,6 +216,7 @@ const STORY_14 = [
   { who: 'seondal', side: 'left', emo: 'smile', text: '전통주로 준비했어. 취향은 존중해야지.' },
   { narr: true, text: '만취한 척 비틀거리는 최호철 앞에, 박쥐 수인의 분신 셋이 소리 없이 내려앉았다.' },
   { who: 'bat', side: 'right', text: '미끼치고는 너무 큰 고기군. 남매의 사냥감을 가로챌 순 없지.' },
+  { who: 'bat', side: 'right', text: '대신 내 분신들이랑 놀아라.' },
   { narr: true, text: '퀘스트 — 순간이동·돌진·공중 낙하를 쓰는 박쥐 수인의 분신 3체 모두 제압.' },
   { narr: true, text: '분신은 모두 베어 냈지만 본체는 없었다. 대신, 얼굴을 요술로 가린 누군가의 목소리가 들렸다.' },
   { who: 'masked', side: 'right', text: '……남매가 쓰러지면, 칼만 회수해라. 나머지는 필요 없다.' },
@@ -223,7 +228,7 @@ const STORY_14 = [
 const BOSS_INTRO = [
   { panels: [
     { rect: [30, 30, 900, 220], caption: '의정부, 자정. 두 자루의 검이 달빛 아래에서 울었다.', draw: panelTwins },
-    { rect: [30, 270, 440, 240], bubble: { who: 'haenim', x: 214, y: 26, w: 210, text: '이 호랑이 가죽, 제법 따뜻하더라. 다음은 네 차례야, 팀장님.', tail: [160, 132] }, draw: panelBust('skill.haenim', 'haenim', 0.02, 2.0) },
+    { rect: [30, 270, 440, 240], bubble: { who: 'haenim', x: 214, y: 26, w: 210, text: '그 가죽, 아주 질겨 보이네. 다음은 네 차례야, 팀장님.', tail: [160, 132] }, draw: panelBust('skill.haenim', 'haenim', 0.02, 2.0) },
     { rect: [490, 270, 440, 240], bubble: { who: 'dalnim', x: 214, y: 26, w: 210, text: '간장이 태우고, 막야가 삼킨다. 호랑이는 하나도 남기지 않아.', tail: [150, 132] }, draw: panelBust('skill.dalnim', 'dalnim', 0.02, 2.0) },
   ] },
 ];
@@ -236,7 +241,7 @@ const PRE_BATTLE = [
   { who: 'dalnim', side: 'right', emo: 'smirk', text: '호랑이는 다 똑같아. 간장이 사악한 기운을 태우고, 막야가 요기를 삼키면 끝이야.' },
   { who: 'dongmin', side: 'left', emo: 'normal', text: '팀장님, 저 칼들… 요기를 먹어 치웁니다. 연기 술법은 안 통할 거예요.' },
   { who: 'hocheol', side: 'left', emo: 'smirk', text: '알고 있다. 그래도 여긴 내 구역이다. 이동민 — 요기 한 방울 없는 네 손이 열쇠다.' },
-  { narr: true, text: 'TIP · 최호철의 연기 술법과 심청이의 수류 술법은 간장·막야가 절반을 삼킨다. 최호철의 주먹, 요기 0%의 이동민, 원거리 부채 바람의 김선달은 정상 타격. 1페이즈 오누이 협공 → 2페이즈 달님 주화입마의 빈틈 → 3페이즈 해님의 동요.' },
+  { narr: true, text: 'TIP · 최호철의 연기 술법과 심청이의 용기 기술(용린참·용왕의 포효·용신강림)은 간장·막야가 절반을 삼킨다. 최호철의 주먹, 요기 0%의 이동민, 부채 바람의 김선달, 심청이의 검과 용 발톱은 정상 타격. 심청이는 적중으로 「용의 기운」을 모아 용 형태로 변신한다. 1페이즈 오누이 협공 → 2페이즈 달님 주화입마의 빈틈 → 3페이즈 해님의 동요.' },
 ];
 
 const POST_BATTLE = [
@@ -551,7 +556,7 @@ class PartyScene {
       c.font = `600 10px ${SANS}`; c.fillStyle = '#cfe8ff';
       c.fillText('스킬 ' + d.skill.name + ' · 궁극기 ' + d.ult.name.split(':')[0], r.x + 12, r.y + r.h - 40);
       c.fillStyle = k === 'hocheol' ? '#c9a6ff' : k === 'simcheong' ? '#9fd8ff' : '#9fffb0';
-      c.fillText(k === 'hocheol' ? '연기 술법 절반 흡수 · 주먹은 정상 타격' : k === 'simcheong' ? '수류 술법 — 막야가 절반 흡수' : k === 'dongmin' ? '요기 0% — 정상 타격 (추천)' : '원거리 부채 바람 — 정상 타격', r.x + 12, r.y + r.h - 22);
+      c.fillText(k === 'hocheol' ? '연기 술법 절반 흡수 · 주먹은 정상 타격' : k === 'simcheong' ? '용의 기운을 모아 용 형태 변신 · 용기 기술 절반 흡수' : k === 'dongmin' ? '요기 0% — 정상 타격 (추천)' : '원거리 부채 바람 — 정상 타격', r.x + 12, r.y + r.h - 22);
       if (on) {
         c.fillStyle = '#c8203e'; circle(c, r.x + r.w - 22, r.y + 22, 16); c.fill(); c.strokeStyle = '#fff'; c.lineWidth = 2; c.stroke();
         c.fillStyle = '#fff'; c.font = `900 15px ${SANS}`; c.textAlign = 'center'; c.fillText(si === 0 ? '선봉' : '2', r.x + r.w - 22, r.y + 23);
