@@ -84,7 +84,7 @@ const pairKey = (a, b) => [a, b].sort().join('+');
 
 // ---------------- effects ----------------
 class Effects {
-  constructor() { this.p = []; this.txt = []; this.sl = []; this.rg = []; this.gh = []; this.vf = []; this.t = 0; this.lastGhost = 0; }
+  constructor() { this.p = []; this.txt = []; this.sl = []; this.rg = []; this.gh = []; this.vf = []; this.sw = []; this.t = 0; this.lastGhost = 0; }
   update(dt) {
     this.t += dt;
     for (const p of this.p) {
@@ -94,7 +94,8 @@ class Effects {
       p.x += p.vx * dt; p.y += p.vy * dt;
     }
     this.p = this.p.filter(p => p.life > 0);
-    for (const a of [this.txt, this.sl, this.rg, this.gh]) for (const e of a) e.life -= dt;
+    for (const a of [this.txt, this.sl, this.rg, this.gh, this.sw]) for (const e of a) e.life -= dt;
+    this.sw = this.sw.filter(e => e.life > 0);
     this.txt = this.txt.filter(e => e.life > 0);
     this.sl = this.sl.filter(e => e.life > 0);
     this.rg = this.rg.filter(e => e.life > 0);
@@ -126,6 +127,19 @@ class Effects {
   dust(x, y) { for (let i = 0; i < 6; i++) this.part(x + rand(-12, 12), y - 2, { vx: rand(-90, 90), vy: rand(-60, -10), life: 0.35, size: rand(4, 8), color: 'rgba(160,150,170,0.5)', shape: 'puff', grow: 10, drag: 0.05 }); }
   impact(x, y, color = '#fff') { this.spark(x, y, color, 8, 360); this.ring(x, y, 40, color, 0.18); }
   slash(x, y, dir, r, flip, color) { this.sl.push({ x, y, dir, r, flip, color, life: 0.18, max: 0.18 }); }
+  // 검기 궤적: 칼끝이 a0 → a1로 휘어 지나가며 남기는 빛의 초승달 (가산 합성 글로우 + 흰 심선).
+  // 각도는 캐릭터 정면 기준(0 = 앞, + = 아래). flipY = 올려베기, tilt = 궤적 기울기.
+  swing(x, y, dir, o = {}) {
+    if (this.sw.length > 24) return;
+    const life = o.life || 0.24;
+    this.sw.push(Object.assign({ x, y, dir, r: 60, color: '#ffffff', core: '#ffffff', a0: -1.35, a1: 1.05, thick: 14, tilt: 0, flipY: false, sweep: 0.38 }, o, { life, max: life }));
+  }
+  // 타격 섬광: 가산 합성 방사광 + 뾰족한 충격 가시 (주먹·둔기용)
+  flash(x, y, r, color, dir = 1, o = {}) {
+    if (this.sw.length > 24) return;
+    const life = o.life || 0.16;
+    this.sw.push(Object.assign({ kind: 'flash', x, y, r, color, dir, spikes: 7, cone: 1.1, rot: rand(0, 6) }, o, { life, max: life }));
+  }
   ring(x, y, r, color, life = 0.35, flat = false) { this.rg.push({ x, y, r, color, life, max: life, flat }); }
   text(x, y, s, color, size = 18, life = 0.9) { this.txt.push({ x: x + rand(-8, 8), y, s, color, size, life, max: life }); }
   ghost(key, x, y, facing, frame) {
@@ -149,6 +163,7 @@ class Effects {
       const a = v.alpha * Math.min(1, v.fin > 0 ? age / v.fin : 1) * Math.min(1, v.life / (v.max * 0.45));
       drawVfx(c, v.name, v.x, v.y, v.w * s, { alpha: a, rot: v.rot, flip: v.flip, ax: v.ax, ay: v.ay, sy: v.sy, add: v.add, h: v.h ? v.h * s : 0 });
     }
+    for (const s of this.sw) drawSwing(c, s);
     for (const p of this.p) {
       const k = p.life / p.max;
       c.globalAlpha = Math.min(1, k * 1.5); c.fillStyle = p.color; c.strokeStyle = p.color;
@@ -175,6 +190,52 @@ class Effects {
     }
     c.globalAlpha = 1;
   }
+}
+
+function drawSwing(c, s) {
+  if (s.kind === 'flash') return drawFlash(c, s);
+  const age = s.max - s.life, K = age / s.max;
+  const p = Math.min(1, K / s.sweep), fade = Math.min(1, s.life / (s.max * 0.55));
+  const head = s.a0 + (s.a1 - s.a0) * easeOut(p);
+  const tail = s.a0 + (s.a1 - s.a0) * Math.max(0, (K - 0.2) / 0.8) * 0.85;
+  if (head - tail < 0.02) return;
+  c.save(); c.translate(s.x, s.y); c.scale(s.dir, s.flipY ? -1 : 1); c.rotate(s.tilt);
+  c.globalCompositeOperation = 'lighter'; c.lineCap = 'round';
+  const N = 12;
+  for (let pass = 0; pass < 3; pass++) { // 0 = 넓은 글로우, 1 = 색 칼날, 2 = 흰 심선
+    const wMul = pass === 0 ? 2.4 : pass === 1 ? 1 : 0.32, aMul = pass === 0 ? 0.16 : pass === 1 ? 0.6 : 0.95;
+    c.strokeStyle = pass === 2 ? s.core : s.color;
+    for (let i = 0; i < N; i++) {
+      const k1 = (i + 1) / N, a0 = tail + (head - tail) * (i / N), a1 = tail + (head - tail) * k1;
+      c.globalAlpha = fade * aMul * (0.15 + 0.85 * k1);
+      c.lineWidth = s.thick * wMul * (0.12 + 0.88 * k1 * k1);
+      c.beginPath(); c.arc(0, 0, s.r - (pass === 2 ? s.thick * 0.12 : 0), a0, a1 + 0.01); c.stroke();
+    }
+  }
+  if (p < 1) { // 칼끝 섬광
+    const hx = Math.cos(head) * s.r, hy = Math.sin(head) * s.r;
+    c.globalAlpha = fade * 0.9; c.fillStyle = s.core;
+    circle(c, hx, hy, s.thick * 0.45); c.fill();
+    c.globalAlpha = fade * 0.35; c.fillStyle = s.color;
+    circle(c, hx, hy, s.thick * 0.85); c.fill();
+  }
+  c.restore();
+}
+
+function drawFlash(c, s) {
+  const K = 1 - s.life / s.max, a = Math.min(1, s.life / (s.max * 0.6)), R = s.r * (0.55 + 0.6 * easeOut(K));
+  c.save(); c.translate(s.x, s.y); c.scale(s.dir, 1); c.globalCompositeOperation = 'lighter';
+  const g = c.createRadialGradient(0, 0, 0, 0, 0, R);
+  g.addColorStop(0, 'rgba(255,255,255,' + (0.95 * a) + ')'); g.addColorStop(0.25, s.color); g.addColorStop(1, 'rgba(0,0,0,0)');
+  c.globalAlpha = a; c.fillStyle = g; circle(c, 0, 0, R); c.fill();
+  c.fillStyle = s.color; c.globalAlpha = a * 0.9;
+  for (let i = 0; i < s.spikes; i++) { // 정면 쪽으로 쏠린 충격 가시
+    const ang = (i / (s.spikes - 1) - 0.5) * 2 * s.cone + Math.sin(s.rot + i * 2.3) * 0.12, L = R * (1.1 + 0.6 * ((i * 37) % 5) / 5);
+    const w = R * 0.13;
+    c.beginPath(); c.moveTo(Math.cos(ang + 1.57) * w, Math.sin(ang + 1.57) * w); c.lineTo(Math.cos(ang) * L, Math.sin(ang) * L); c.lineTo(Math.cos(ang - 1.57) * w, Math.sin(ang - 1.57) * w); c.fill();
+  }
+  c.globalAlpha = a; c.fillStyle = '#ffffff'; circle(c, 0, 0, R * 0.22); c.fill();
+  c.restore();
 }
 
 // ---------------- base physics body ----------------
@@ -320,23 +381,68 @@ class Player extends Fighter {
       fx.vfx('seondal_aura', this.x, this.y - this.h * 0.5, 170, { life: 0.55, s0: 0.7, s1: 1.35, spin: 5 });
       b.skillCard(this.key, 'passive', this.d.passive.name);
     }
+    const F = this.facing, fin = this.comboIdx === this.d.combo.length - 1, step = this.comboIdx;
     switch (a.fx) {
-      case 'blade': case 'blade2': fx.slash(x, cy, this.facing, 46, a.fx === 'blade2', '#e8eef8'); break;
-      case 'bladeBig': fx.slash(x, cy, this.facing, 64, false, '#ff5a5a'); break;
-      case 'punch': fx.ring(this.x + this.facing * 58, cy, 28, '#ffa040', 0.2); fx.smoke(this.x + this.facing * 60, cy, 2, 'rgba(25,22,32,0.7)', 16); break;
-      case 'pipe': fx.ring(this.x + this.facing * 58, cy, 46, '#ffa040', 0.2); fx.smoke(this.x + this.facing * 60, cy, 6, 'rgba(25,22,32,0.7)', 16); break;
+      // ── 이동민: 쌍검 — 붉은 검기 궤적이 번갈아 교차, 막타는 X자 돌진 참격
+      case 'blade': case 'blade2': {
+        const up = a.fx === 'blade2';
+        fx.swing(this.x + F * 18, cy, F, { r: 58, color: '#ff3a4e', core: '#fff1f1', thick: 15, tilt: up ? 0.15 : step === 2 ? -0.35 : 0.1, flipY: up, life: 0.2 });
+        fx.swing(this.x + F * 10, cy + 4, F, { r: 44, color: '#ff8a96', core: '#ffffff', thick: 7, tilt: up ? 0.5 : -0.15, flipY: !up, life: 0.17, sweep: 0.5 });
+        for (let i = 0; i < 5; i++) fx.part(this.x + F * rand(30, 80), cy + rand(-24, 24), { vx: F * rand(220, 420), vy: rand(-60, 60), life: 0.16, size: 2, color: '#ff8a96', shape: 'line', drag: 0.2 });
+        break;
+      }
+      case 'bladeBig':
+        fx.swing(this.x + F * 22, cy, F, { r: 74, color: '#ff2a3e', core: '#ffffff', thick: 20, tilt: -0.5, life: 0.28 });
+        fx.swing(this.x + F * 22, cy, F, { r: 74, color: '#ff2a3e', core: '#ffffff', thick: 20, tilt: 0.5, flipY: true, life: 0.28 });
+        fx.vfx('dongmin_xslash', this.x + F * 70, cy, 170, { flip: F < 0, life: 0.32, s0: 0.6, s1: 1.15, add: true, fin: 0.03 });
+        fx.ghost(this.key, this.x - F * 30, this.y, F, this.spriteFrame(b.t));
+        b.shake(3);
+        break;
+      // ── 최호철: 맹호권 — 주먹 끝에서 흑연 발톱이 할퀴고 충격파가 터진다, 막타는 흑호의 머리가 뛰어든다
+      case 'punch': {
+        const px = this.x + F * 62;
+        fx.vfx('hocheol_claw', px + F * 30, cy - 4, 200, { flip: F > 0, sy: step === 1 ? -0.8 : 0.8, life: 0.28, s0: 0.7, s1: 1.1, fin: 0.03, add: true });
+        fx.flash(px, cy, 46, 'rgba(255,150,50,0.9)', F, { life: 0.17 });
+        fx.ring(px, cy, 34, '#ffb050', 0.2); fx.ring(px, cy, 20, '#c9a0ff', 0.16);
+        fx.swing(this.x + F * 30, cy, F, { r: 36, color: '#ff9a3c', core: '#fff3d8', thick: 10, a0: -0.6, a1: 0.6, tilt: step === 1 ? -0.3 : 0.3, life: 0.16, sweep: 0.3 });
+        for (let i = 0; i < 6; i++) { const ang = rand(-0.7, 0.7); fx.part(px, cy, { vx: F * Math.cos(ang) * rand(260, 460), vy: Math.sin(ang) * rand(260, 460), life: 0.18, size: 2.4, color: i % 2 ? '#ffb050' : '#c9a0ff', shape: 'line', drag: 0.05 }); }
+        break;
+      }
+      case 'pipe': {
+        const px = this.x + F * 70;
+        fx.vfx('hocheol_head', px + F * 30, cy - 6, 200, { flip: F < 0, vx: F * 360, life: 0.38, s0: 0.55, s1: 1.15, fin: 0.04 });
+        fx.vfx('hocheol_claw', px + F * 40, cy, 210, { flip: F > 0, life: 0.3, s0: 0.8, s1: 1.15, add: true });
+        fx.swing(this.x + F * 26, cy - 6, F, { r: 70, color: '#ff8a2a', core: '#fff0d0', thick: 18, a0: -1.6, a1: 1.2, life: 0.26 });
+        fx.flash(px, cy, 80, 'rgba(255,140,40,0.9)', F, { life: 0.22, spikes: 9, cone: 1.4 });
+        fx.ring(px, cy, 64, '#ffb050', 0.28); fx.ring(this.x + F * 40, this.y, 90, '#b47cff', 0.3, true);
+        fx.smoke(px, cy, 4, 'rgba(110,70,160,0.3)', 26); fx.dust(this.x + F * 30, this.y);
+        b.shake(5);
+        break;
+      }
+      // ── 김선달: 부채 바람 투사체 (FanShot)
       case 'fan': case 'fanBig': // 부채를 휘두른 자리에 짧은 바람 + 투사체 발사
         fx.slash(x - this.facing * 6, cy, this.facing, a.fx === 'fanBig' ? 44 : 32, Math.random() < 0.5, pierce ? '#ffffff' : '#9fe0ff');
         for (let i = 0; i < 4; i++) fx.part(x, cy + rand(-14, 14), { vx: this.facing * rand(160, 320), vy: rand(-40, 40), life: 0.22, size: 2.2, color: '#bfeaff', shape: 'line', drag: 0.3 });
         Sfx.play('wind'); break;
-      case 'sword': case 'swordUp': fx.slash(x, cy, this.facing, 54, a.fx === 'swordUp', '#ffc0e0'); break;
-      case 'swordBig':
-        fx.slash(x, cy, this.facing, 72, false, '#ff6aa8');
-        for (let i = 0; i < 8; i++) fx.part(this.x + this.facing * rand(20, 110), cy + rand(-20, 20), { vx: this.facing * rand(80, 220), vy: rand(-120, -20), life: 0.4, size: rand(2, 4), color: '#8ad8ff', grav: 600 });
+      // ── 심청이: 수류검 — 검은 물결이 검로를 따라 흐르고 물방울이 흩어진다. 용 변신 중엔 흑련(보라) 검기
+      case 'sword': case 'swordUp': case 'swordBig': {
+        const dr = this.dragon, big = a.fx === 'swordBig', up = a.fx === 'swordUp';
+        const col = dr ? '#b57cff' : '#ff5fa8', core = dr ? '#f3e0ff' : '#e6fbff', drop = dr ? '#d9a8ff' : '#8ad8ff';
+        fx.swing(this.x + F * 20, cy, F, { r: big ? 84 : 64, color: col, core, thick: big ? 22 : 16, tilt: big ? -0.2 : up ? 0.1 : 0.05, flipY: up, life: big ? 0.3 : 0.22 });
+        fx.swing(this.x + F * 16, cy + (up ? -6 : 6), F, { r: big ? 70 : 52, color: dr ? '#7a5cff' : '#3fc8ff', core: '#ffffff', thick: big ? 10 : 7, tilt: up ? 0.35 : -0.25, flipY: up, life: big ? 0.26 : 0.2, sweep: 0.45 });
+        if (!big) fx.vfx('simcheong_stream', this.x + F * 74, cy + (up ? -10 : 8), 150, { flip: F > 0, sy: up ? -0.55 : 0.55, life: 0.22, s0: 0.7, s1: 1.1, add: true, alpha: 0.85, vx: F * 140 });
+        else {
+          fx.vfx(dr ? 'simcheong_lotus' : 'simcheong_whirl', this.x + F * 80, cy, 190, { life: 0.4, s0: 0.45, s1: 1.15, add: true, spin: F * 4 });
+          fx.vfx('simcheong_stream', this.x + F * 110, cy, 230, { flip: F > 0, sy: 0.4, life: 0.3, s0: 0.6, s1: 1.2, add: true, vx: F * 260 });
+          b.shake(4);
+        }
+        for (let i = 0; i < (big ? 14 : 7); i++) fx.part(this.x + F * rand(20, big ? 120 : 80), cy + rand(-24, 24), { vx: F * rand(60, 240), vy: rand(-220, -40), life: rand(0.35, 0.6), size: rand(2, 4.5), color: i % 3 ? drop : '#ffffff', grav: 900, drag: 0.4 });
         break;
+      }
     }
+    if (!a.shot && a.lunge > 100) fx.ghost(this.key, this.x - F * 14, this.y, F, this.spriteFrame(b.t));
     if (a.shot) { b.zones.push(new FanShot(b, this, { mult, push: a.push, range, h: a.height, big: a.fx === 'fanBig', pierce })); return; }
-    b.playerHit(this, this.frontRect(range, a.height, -10), { mult, push: a.push, basic: true, pierce });
+    b.playerHit(this, this.frontRect(range, a.height, -10), { mult, push: a.push, basic: true, pierce, fin });
   }
   trySkill() {
     if (this.skillCd > 0) return;
@@ -1317,11 +1423,32 @@ class Battle {
       this.fx.text(cx, cy - 72, this.phase === 1 ? '오누이의 공명 — 쓰러지지 않는다' : '해님은 버틴다 — 달님을 먼저 제압하라!', '#ffd27a', 15, 1.4);
     }
     if (!o.quiet || Math.random() < 0.3) this.fx.impact(cx + rand(-10, 10), cy + rand(-15, 15), crit ? '#ffe066' : '#ffffff');
+    if (o.basic) this.basicHitFx(src, e, cx, cy, !!o.fin, crit);
     if (!o.quiet) { this.hitstop = Math.max(this.hitstop, crit ? 0.07 : 0.035); this.shake(crit ? 6 : 3); Sfx.play(crit ? 'crit' : 'hit'); }
     const hanX = src.key === 'simcheong' && src.hp / src.maxHp <= HAN_HP ? 2 : 1; // 인당수의 한: 위기 중 궁극기 충전 2배
     src.ult = Math.min(100, src.ult + dmg / 14 * hanX);
     if (!this.synergy) this.addSyn(dmg / 15);
     return dmg;
+  }
+  // 평타 적중 연출 — 캐릭터마다 다른 타격감 (베인 자국 / 충격 / 물보라)
+  basicHitFx(src, e, cx, cy, fin, crit) {
+    const fx = this.fx, F = src.facing, x = cx + rand(-8, 8), y = cy + rand(-14, 10);
+    if (src.key === 'dongmin') {
+      fx.swing(x - F * 26, y, F, { r: 30, color: '#ff2a3e', core: '#ffffff', thick: 6, a0: -0.9, a1: 0.9, tilt: rand(-0.8, 0.8), life: 0.16, sweep: 0.25 });
+      fx.flash(x, y, fin ? 50 : 28, 'rgba(255,60,80,0.8)', F, { life: 0.12, spikes: 5, cone: 0.5 });
+      fx.spark(x, y, '#ff5a6a', fin ? 14 : 7, fin ? 420 : 300);
+      if (fin) { fx.vfx('dongmin_xslash', x, y, 140, { flip: F < 0, life: 0.28, s0: 1.2, s1: 0.9, add: true, fin: 0.02 }); this.hitstop = Math.max(this.hitstop, 0.08); }
+    } else if (src.key === 'hocheol') {
+      fx.flash(x, y, fin ? 70 : 44, 'rgba(255,170,70,0.85)', F, { life: fin ? 0.2 : 0.14, cone: 1.6 });
+      fx.ring(x, y, fin ? 70 : 42, '#ffb050', 0.22); fx.spark(x, y, '#ffc070', fin ? 14 : 8, fin ? 460 : 340);
+      if (fin) fx.smoke(x, y, 4, 'rgba(110,70,160,0.3)', 30);
+      if (fin) { fx.vfx('hocheol_roar', x, e.y - 30, 200, { life: 0.4, s0: 0.5, s1: 1.1, add: true, alpha: 0.8 }); this.hitstop = Math.max(this.hitstop, 0.09); this.shake(7); }
+    } else if (src.key === 'simcheong') {
+      const dr = src.dragon, drop = dr ? '#d9a8ff' : '#8ad8ff';
+      for (let i = 0; i < (fin ? 16 : 8); i++) { const ang = -Math.PI / 2 + rand(-1.2, 1.2); const sp = rand(160, fin ? 420 : 300); fx.part(x, y, { vx: Math.cos(ang) * sp + F * 80, vy: Math.sin(ang) * sp, life: rand(0.3, 0.55), size: rand(2, 4.5), color: i % 3 ? drop : '#ffffff', grav: 900, drag: 0.3 }); }
+      fx.ring(x, y, fin ? 54 : 34, dr ? '#b57cff' : '#5fd0ff', 0.24);
+      if (fin) { fx.vfx(dr ? 'simcheong_lotus' : 'simcheong_whirl', x, y, 150, { life: 0.4, s0: 0.4, s1: 1.1, add: true, spin: 5 }); this.hitstop = Math.max(this.hitstop, 0.07); }
+    }
   }
   hitPlayer(dmg, o = {}) {
     const p = this.player;
