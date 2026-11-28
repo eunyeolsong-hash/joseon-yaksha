@@ -540,7 +540,7 @@ class PartyScene {
     neonButton(c, 8, 6, 120, 40, '◀ 월드맵', { size: 14 });
     c.textAlign = 'left'; c.textBaseline = 'middle';
     c.font = `800 22px ${SERIF}`; outlinedText(c, '출전 편성 — 2인을 선택하세요', 148, 27, '#ffe0ee', '#000', 4);
-    c.font = `600 12px ${SANS}`; outlinedText(c, '먼저 고른 캐릭터가 선봉으로 출전합니다 · 추천: 이동민(요기 0% — 간장·막야에 정상 타격)', 148, 50, '#d8c0d0', '#000', 3);
+    c.font = `600 12px ${SANS}`; outlinedText(c, '먼저 고른 캐릭터가 선봉, 다음이 후봉(교대 대기)입니다 · 추천: 이동민(요기 0% — 간장·막야에 정상 타격)', 148, 50, '#d8c0d0', '#000', 3);
     PLAYABLE.forEach((k, i) => {
       const r = this.cardRect(i), d = CHAR_DATA[k], si = this.sel.indexOf(k), on = si >= 0, cur = i === this.cursor;
       c.save();
@@ -559,7 +559,7 @@ class PartyScene {
       c.fillText(k === 'hocheol' ? '연기 술법 절반 흡수 · 주먹은 정상 타격' : k === 'simcheong' ? '용의 기운을 모아 용 형태 변신 · 용기 기술 절반 흡수' : k === 'dongmin' ? '요기 0% — 정상 타격 (추천)' : '원거리 부채 바람 — 정상 타격', r.x + 12, r.y + r.h - 22);
       if (on) {
         c.fillStyle = '#c8203e'; circle(c, r.x + r.w - 22, r.y + 22, 16); c.fill(); c.strokeStyle = '#fff'; c.lineWidth = 2; c.stroke();
-        c.fillStyle = '#fff'; c.font = `900 15px ${SANS}`; c.textAlign = 'center'; c.fillText(si === 0 ? '선봉' : '2', r.x + r.w - 22, r.y + 23);
+        c.fillStyle = '#fff'; c.font = `900 15px ${SANS}`; c.textAlign = 'center'; c.fillText(si === 0 ? '선봉' : '후봉', r.x + r.w - 22, r.y + 23);
       }
       c.restore();
     });

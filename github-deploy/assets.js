@@ -191,7 +191,7 @@ const Assets = {
       im.onerror = () => { this.failed.push(src); done(); };
       im.src = src; store[key] = im;
     };
-    for (const [k, f] of Object.entries(IMG_FILES)) add(this.imgs, k, f + '?v=2');
+    for (const [k, f] of Object.entries(IMG_FILES)) add(this.imgs, k, f + '?v=3');
     for (const k of Object.keys(SPRITES)) add(this.sprites, k, k + '.png?v=5');
     for (const k of Object.keys(BUSTS)) add(this.busts, k, k + '.png?v=5');
     for (const k of VFX) add(this.vfx, k, 'vfx_' + k + '.webp?v=4');
